@@ -60,6 +60,7 @@ function keyStatus(provider: string): "ok" | "wrong" | "missing" {
   const v = findKey(provider);
   if (!v) return "missing";
   if (provider === "openai" && v.startsWith("sk-ant-")) return "wrong";
+  if (provider === "gemini") return v.startsWith("AIza") || v.startsWith("AQ.") ? "ok" : "wrong";
   return v.startsWith(KEY_PREFIX[provider]) ? "ok" : "wrong";
 }
 const KEYS = {
