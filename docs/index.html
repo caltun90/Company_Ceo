@@ -125,6 +125,19 @@ nav.tabs button.on{color:var(--brass2)}
 .send:disabled{opacity:.4}
 .send svg{width:20px;height:20px;stroke:#16130a;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 
+/* ---------- ofis */
+#officeScene{background:radial-gradient(90% 70% at 50% 0%, rgba(201,162,39,.09), transparent 70%)}
+#officeScene svg{display:block;width:100%;height:auto;max-height:60vh;-webkit-user-select:none;user-select:none}
+.oticker{display:flex;align-items:center;gap:9px;margin:0 12px 8px;padding:10px 12px;background:var(--card);border:1px solid var(--line);border-radius:14px;font-size:13.5px;min-height:44px}
+.oticker .dot{width:8px;height:8px;border-radius:50%;background:var(--brass);flex:none}
+.oticker .txt{flex:1;min-width:0}
+.oticker button{flex:none;background:var(--brass);color:#16130a;font-weight:600;font-size:13px;border-radius:10px;padding:7px 12px}
+#oTasks{padding:0 12px 14px;margin-top:0}
+.o-lid.work{animation:lid 1s ease-in-out infinite}
+@keyframes lid{50%{opacity:.4}}
+.o-dot.work{animation:pulse 1.2s ease-in-out infinite}
+.runhead .watch{font-size:12px;color:var(--brass2);border:1px solid rgba(201,162,39,.5);border-radius:8px;padding:3px 8px}
+
 /* ---------- ekip */
 .pad{padding:16px 14px calc(24px)}
 .sectiontitle{font:600 22px/1.2 var(--serif);margin:4px 2px 4px}
@@ -208,18 +221,26 @@ nav.tabs button.on{color:var(--brass2)}
   <main>
     <div class="view" id="chatView">
       <div id="feed"></div>
-      <div class="composer">
-        <textarea id="input" rows="1" placeholder="CEO'ya yaz..."></textarea>
-        <button class="send" id="sendBtn" aria-label="Gönder"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
-      </div>
+    </div>
+
+    <div class="view hidden" id="officeView">
+      <div id="officeScene"></div>
+      <div class="oticker"><span class="dot"></span><span class="txt" id="oTickText">Ofis hazırlanıyor</span><button id="oAnswerBtn" class="hidden">Cevabı oku</button></div>
+      <div id="oTasks" class="tasklist"></div>
     </div>
 
     <div class="view hidden" id="teamView"><div class="pad" id="teamPad"></div></div>
     <div class="view hidden" id="tasksView"><div class="pad" id="tasksPad"></div></div>
   </main>
 
+  <div class="composer" id="composer">
+    <textarea id="input" rows="1" placeholder="CEO'ya yaz..."></textarea>
+    <button class="send" id="sendBtn" aria-label="Gönder"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+  </div>
+
   <nav class="tabs">
     <button data-tab="chat" class="on"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>Sohbet</button>
+    <button data-tab="office"><svg viewBox="0 0 24 24"><path d="M3 20h18M5 20V8l7-4v16M12 10h7v10M8 10v.01M8 13.5v.01M8 17v.01M15.5 13.5v.01M15.5 17v.01"/></svg>Ofis</button>
     <button data-tab="team"><svg viewBox="0 0 24 24"><circle cx="12" cy="6" r="3"/><circle cx="5" cy="17" r="2.5"/><circle cx="12" cy="17" r="2.5"/><circle cx="19" cy="17" r="2.5"/><path d="M12 9v3M5 14.5V12h14v2.5M12 12v2.5"/></svg>Ekip</button>
     <button data-tab="tasks"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/></svg>Görevler</button>
   </nav>
@@ -359,6 +380,7 @@ async function enterApp(user) {
     return;
   }
   await Promise.all([loadAgents(), loadConvs()]);
+  officeBuild();
   if (state.convId && !state.convs.find((c) => c.id === state.convId)) state.convId = null;
   await openConv(state.convId);
   subscribe();
@@ -393,10 +415,9 @@ async function openConv(id) {
       state.runTasks = t || [];
     }
   }
-  const c = state.convs.find((x) => x.id === id);
-  $("#topTitle").textContent = c ? c.title : "Şirket";
   renderFeed(true);
   renderConvs();
+  officeSync();
 }
 
 // ---------------------------------------------------------------- canli
@@ -409,6 +430,7 @@ function subscribe() {
         state.messages.push(m);
         if (m.role !== "user" && state.activeRun?.id === m.run_id) { state.activeRun = null; state.runTasks = []; }
         renderFeed(true);
+        if (m.role !== "user") officeOnAnswer(m.role === "ceo");
         if (m.role === "ceo" && document.hidden && navigator.vibrate) navigator.vibrate(80);
       } else if (m.role === "ceo") {
         toast("CEO başka bir konuda cevap verdi");
@@ -420,15 +442,17 @@ function subscribe() {
       else if (state.activeRun?.id === r.id) { state.activeRun = null; state.runTasks = []; }
       renderRunCard();
       renderTop();
+      ofIdleLook();
     })
     .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, ({ new: t }) => {
       if (!t) return;
       const i = state.allTasks.findIndex((x) => x.id === t.id);
       if (i >= 0) state.allTasks[i] = t; else state.allTasks.unshift(t);
-      if (state.activeRun && t.run_id === state.activeRun.id) {
+      if (state.activeRun && t.conversation_id === state.convId && (!state.activeRun.id || t.run_id === state.activeRun.id)) {
         const j = state.runTasks.findIndex((x) => x.id === t.id);
         if (j >= 0) state.runTasks[j] = t; else state.runTasks.push(t);
         renderRunCard();
+        officeOnTask(t);
       }
       if (state.tab === "tasks") renderTasks();
     })
@@ -498,6 +522,7 @@ function msgEl(m) {
   return row;
 }
 function renderRunCard() {
+  renderOfficeTasks();
   const slot = $("#runSlot");
   if (!slot) return;
   const r = state.activeRun;
@@ -505,10 +530,11 @@ function renderRunCard() {
   const open = new Set([...slot.querySelectorAll(".trow.open")].map((e) => e.dataset.id));
   slot.innerHTML = `<div class="runcard">
     <div class="runhead"><span class="dot"></span><span class="note">${esc(r.note || "CEO çalışıyor")}</span>
-    <button class="cancel" id="cancelRun">Durdur</button></div>
+    <button class="watch" id="watchRun">Ofiste izle</button><button class="cancel" id="cancelRun">Durdur</button></div>
     ${state.runTasks.length ? `<div class="tasklist">${state.runTasks.map((t) => taskRow(t, open.has(t.id))).join("")}</div>` : ""}
   </div>`;
   slot.querySelectorAll(".trow").forEach((e) => (e.onclick = () => e.classList.toggle("open")));
+  $("#watchRun").onclick = (ev) => { ev.stopPropagation(); showTab("office"); };
   $("#cancelRun").onclick = async (ev) => {
     ev.stopPropagation();
     try { await invoke({ action: "cancel", run_id: r.id }); } catch (e) { toast(e.message); }
@@ -525,8 +551,11 @@ function taskRow(t, open) {
 }
 function renderTop() {
   const r = state.activeRun;
-  $("#topSub").textContent = r ? (r.status === "delegating" ? "Ekip çalışıyor" : "CEO düşünüyor") : "CEO hazır";
   $("#sendBtn").disabled = !!r;
+  if (state.tab !== "chat" && state.tab !== "office") return;
+  $("#topSub").textContent = r ? (r.status === "delegating" ? "Ekip çalışıyor" : "CEO düşünüyor") : "CEO hazır";
+  if (state.tab === "office") $("#topTitle").textContent = "Ofis";
+  else { const c = state.convs.find((x) => x.id === state.convId); $("#topTitle").textContent = c ? c.title : "Şirket"; }
 }
 
 // ---------------------------------------------------------------- gonder
@@ -543,6 +572,7 @@ async function send() {
   state.messages.push(temp);
   state.activeRun = { id: null, status: "thinking", note: "CEO'ya iletiliyor", created_at: new Date().toISOString() };
   renderFeed(true);
+  officeOnAsk();
   try {
     const res = await invoke({ action: "send", conversation_id: state.convId, text });
     state.messages = state.messages.filter((m) => m.id !== temp.id);
@@ -555,11 +585,13 @@ async function send() {
     }
     if (!state.activeRun || !state.activeRun.id) state.activeRun = { id: res.run_id, status: "thinking", note: "CEO düşünüyor", created_at: new Date().toISOString() };
     renderFeed(true);
+    ofIdleLook();
   } catch (e) {
     state.activeRun = null;
     state.messages = state.messages.filter((m) => m.id !== temp.id);
     input.value = text;
     renderFeed(true);
+    officeSync();
     toast(e.message, 4000);
   }
 }
@@ -598,12 +630,14 @@ function showTab(tab) {
   state.tab = tab;
   document.querySelectorAll("nav.tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
   $("#chatView").classList.toggle("hidden", tab !== "chat");
+  $("#officeView").classList.toggle("hidden", tab !== "office");
+  $("#composer").classList.toggle("hidden", tab !== "chat" && tab !== "office");
   $("#teamView").classList.toggle("hidden", tab !== "team");
   $("#tasksView").classList.toggle("hidden", tab !== "tasks");
   $("#newBtn").classList.toggle("hidden", tab !== "chat");
   if (tab === "team") { $("#topTitle").textContent = "Ekip"; $("#topSub").textContent = "CEO ve müdürler"; renderTeam(); refreshKeys(); }
   else if (tab === "tasks") { $("#topTitle").textContent = "Görevler"; $("#topSub").textContent = "Müdürlere verilen işler"; loadTasks(); }
-  else { const c = state.convs.find((x) => x.id === state.convId); $("#topTitle").textContent = c ? c.title : "Şirket"; renderTop(); }
+  else { renderTop(); if (tab === "chat") requestAnimationFrame(() => ($("#feed").scrollTop = $("#feed").scrollHeight)); }
 }
 
 // ---------------------------------------------------------------- ekip
@@ -644,6 +678,7 @@ function renderTeam() {
     if (error) return toast(error.message);
     a.enabled = !a.enabled;
     renderTeam();
+    officeBuild();
   }));
 }
 function editAgent(key) {
@@ -672,6 +707,7 @@ function editAgent(key) {
     Object.assign(a, patch);
     closeDrawer();
     renderTeam();
+    officeBuild();
     toast("Kaydedildi");
   };
 }
@@ -710,6 +746,398 @@ function renderTasks() {
   });
   $("#tasksPad").querySelectorAll("[data-goto]").forEach((b) => (b.onclick = () => { showTab("chat"); openConv(b.dataset.goto); }));
 }
+
+// ---------------------------------------------------------------- ofis
+// Ofis sahnesi: mudurler masalarinda oturur, CEO gorev dosyasini masadan masaya tasir.
+const OF = { HW: 20, HH: 15, ZS: 21, OX: 200, OY: 76, N: 9.6, WH: 3.0 };
+const OF_SLOTS = [[4.5, 1.5], [7.5, 1.5], [1.5, 4.5], [4.5, 4.5], [7.5, 4.5], [1.5, 7.5], [4.5, 7.5], [7.5, 7.5]];
+const OF_HOME = [1.5, 0.75];
+const OF_EXIT = [3, 0.75];
+const OF_SHORT = { arastirma: "Araştırma", icerik: "İçerik", teknik: "Teknik", finans: "Finans", grok: "Grok", gorsel_gpt: "Tasarım", gorsel_gemini: "Stüdyo" };
+const SVGNS = "http://www.w3.org/2000/svg";
+const oP = (gx, gy, z = 0) => [OF.OX + (gx - gy) * OF.HW, OF.OY + (gx + gy) * OF.HH - z * OF.ZS];
+const oPts = (a) => a.map((p) => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ");
+function oEl(tag, attrs, parent) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs || {}) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function oBox(g, cx, cy, w, d, z0, z1, top, right, left) {
+  const x0 = cx - w / 2, x1 = cx + w / 2, y0 = cy - d / 2, y1 = cy + d / 2;
+  const r = oEl("polygon", { points: oPts([oP(x1, y0, z0), oP(x1, y1, z0), oP(x1, y1, z1), oP(x1, y0, z1)]), fill: right }, g);
+  const l = oEl("polygon", { points: oPts([oP(x0, y1, z0), oP(x1, y1, z0), oP(x1, y1, z1), oP(x0, y1, z1)]), fill: left }, g);
+  const t = oEl("polygon", { points: oPts([oP(x0, y0, z1), oP(x1, y0, z1), oP(x1, y1, z1), oP(x0, y1, z1)]), fill: top }, g);
+  return { r, l, t };
+}
+function oPawn(parent, color, big) {
+  const g = oEl("g", {}, parent);
+  oEl("ellipse", { cx: 0, cy: 0, rx: 8.5, ry: 3.8, fill: "rgba(0,0,0,.4)" }, g);
+  const b = oEl("g", {}, g);
+  const s = big ? 1.12 : 1;
+  const body = oEl("g", { transform: `scale(${s})` }, b);
+  oEl("path", { d: "M-7.5 -1 Q-8.6 -15 0 -16.5 Q8.6 -15 7.5 -1 Q0 2.6 -7.5 -1Z", fill: color, stroke: "rgba(0,0,0,.35)", "stroke-width": 0.8 }, body);
+  oEl("circle", { cx: 0, cy: -21.5, r: 6, fill: "#f3ead6", stroke: "rgba(0,0,0,.35)", "stroke-width": 0.8 }, body);
+  oEl("circle", { cx: -2.1, cy: -21.3, r: 0.95, fill: "#1b1e26" }, body);
+  oEl("circle", { cx: 2.1, cy: -21.3, r: 0.95, fill: "#1b1e26" }, body);
+  return { g, b, body };
+}
+function oPill(parent, text, x, y, opts = {}) {
+  const g = oEl("g", { transform: `translate(${x.toFixed(1)},${y.toFixed(1)})` }, parent);
+  const w = Math.max(30, [...text].length * 5.7 + (opts.dot ? 26 : 16));
+  const rect = oEl("rect", { x: -w / 2, y: -9, width: w, height: 18, rx: 9, fill: opts.fill || "rgba(18,21,28,.92)", stroke: opts.stroke || "#2f3646", "stroke-width": 1 }, g);
+  let dot = null;
+  if (opts.dot) dot = oEl("circle", { cx: -w / 2 + 9, cy: 0, r: 3, fill: "#5d6372", class: "o-dot" }, g);
+  const t = oEl("text", { x: opts.dot ? 6 : 0, y: 3.6, "text-anchor": "middle", "font-size": 10.5, "font-weight": 600, fill: opts.color || "#ece9e2", "font-family": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" }, g);
+  t.textContent = text;
+  return { g, rect, dot, t, w };
+}
+
+const ofc = { built: false, gen: 0, queue: [], busy: false, known: new Map(), desks: {}, sprites: [], ceo: null, env: null, last: 0, answer: false };
+
+function officeBuild() {
+  const host = $("#officeScene");
+  if (!host) return;
+  ofc.gen++;
+  ofc.queue = []; ofc.busy = false; ofc.known = new Map(); ofc.desks = {}; ofc.sprites = []; ofc.answer = false;
+  host.innerHTML = "";
+  const svg = oEl("svg", { viewBox: "0 6 400 376", role: "img", "aria-label": "Ofis" }, host);
+  const N = OF.N, WH = OF.WH;
+
+  // duvarlar
+  oEl("polygon", { points: oPts([oP(0, 0), oP(0, N), oP(0, N, WH), oP(0, 0, WH)]), fill: "#131826" }, svg);
+  oEl("polygon", { points: oPts([oP(0, 0), oP(N, 0), oP(N, 0, WH), oP(0, 0, WH)]), fill: "#181e2e" }, svg);
+  oEl("polyline", { points: oPts([oP(0, N, WH), oP(0, 0, WH), oP(N, 0, WH)]), fill: "none", stroke: "#2c3447", "stroke-width": 1.2 }, svg);
+  for (const [a, b] of [[5.0, 6.8], [7.4, 9.1]]) {
+    oEl("polygon", { points: oPts([oP(0, a, 1.0), oP(0, b, 1.0), oP(0, b, 2.4), oP(0, a, 2.4)]), fill: "rgba(120,160,255,.10)", stroke: "rgba(140,170,255,.3)", "stroke-width": 1 }, svg);
+    const m = (a + b) / 2;
+    oEl("line", { x1: oP(0, m, 1.0)[0], y1: oP(0, m, 1.0)[1], x2: oP(0, m, 2.4)[0], y2: oP(0, m, 2.4)[1], stroke: "rgba(140,170,255,.24)", "stroke-width": 1 }, svg);
+  }
+  for (const [a, b] of [[3.6, 5.4], [6.0, 7.8]]) {
+    oEl("polygon", { points: oPts([oP(a, 0, 1.0), oP(b, 0, 1.0), oP(b, 0, 2.4), oP(a, 0, 2.4)]), fill: "rgba(120,160,255,.10)", stroke: "rgba(140,170,255,.3)", "stroke-width": 1 }, svg);
+    const m = (a + b) / 2;
+    oEl("line", { x1: oP(m, 0, 1.0)[0], y1: oP(m, 0, 1.0)[1], x2: oP(m, 0, 2.4)[0], y2: oP(m, 0, 2.4)[1], stroke: "rgba(140,170,255,.24)", "stroke-width": 1 }, svg);
+  }
+  // tabela (sol duvar)
+  oEl("polygon", { points: oPts([oP(0, 4.3, 1.75), oP(0, 0.9, 1.75), oP(0, 0.9, 2.7), oP(0, 4.3, 2.7)]), fill: "#1f1a0c", stroke: "#c9a227", "stroke-width": 1 }, svg);
+  const s0 = oP(0, 4.3, 2.7);
+  const sign = oEl("text", { transform: `matrix(1,${(-OF.HH / OF.HW).toFixed(3)},0,1,${s0[0].toFixed(1)},${s0[1].toFixed(1)})`, x: 34, y: 14.5, "text-anchor": "middle", "font-size": 11.5, "font-weight": 600, "letter-spacing": 2, fill: "#e6c65c", "font-family": "Fraunces,Georgia,serif" }, svg);
+  sign.textContent = "ŞİRKET";
+
+  // zemin
+  oEl("polygon", { points: oPts([oP(N, 0), oP(N, N), [oP(N, N)[0], oP(N, N)[1] + 7], [oP(N, 0)[0], oP(N, 0)[1] + 7]]), fill: "#0d1018" }, svg);
+  oEl("polygon", { points: oPts([oP(0, N), oP(N, N), [oP(N, N)[0], oP(N, N)[1] + 7], [oP(0, N)[0], oP(0, N)[1] + 7]]), fill: "#10141d" }, svg);
+  oEl("polygon", { points: oPts([oP(0, 0), oP(N, 0), oP(N, N), oP(0, N)]), fill: "#1e2539" }, svg);
+  for (let i = 1.2; i < N; i += 1.2) {
+    oEl("line", { x1: oP(i, 0)[0], y1: oP(i, 0)[1], x2: oP(i, N)[0], y2: oP(i, N)[1], stroke: "rgba(255,255,255,.045)" }, svg);
+    oEl("line", { x1: oP(0, i)[0], y1: oP(0, i)[1], x2: oP(N, i)[0], y2: oP(N, i)[1], stroke: "rgba(255,255,255,.045)" }, svg);
+  }
+  // CEO halisi
+  oEl("polygon", { points: oPts([oP(0.3, 0.2), oP(2.7, 0.2), oP(2.7, 2.3), oP(0.3, 2.3)]), fill: "rgba(201,162,39,.09)", stroke: "rgba(201,162,39,.3)", "stroke-width": 1 }, svg);
+
+  const world = oEl("g", {}, svg);
+  const top = oEl("g", {}, svg);
+
+  // CEO masasi
+  const cg = oEl("g", {}, world);
+  oBox(cg, 1.5, 1.5, 1.9, 0.95, 0, 0.58, "#4a3c16", "#2a220d", "#352b10");
+  oBox(cg, 1.5, 1.6, 0.6, 0.06, 0.58, 1.0, "#3a4154", "#232938", "#c9a227");
+  ofc.sprites.push({ node: cg, key: 3 });
+
+  // mudur masalari
+  const managers = state.agents.filter((a) => a.key !== "ceo");
+  OF_SLOTS.forEach(([dx, dy], i) => {
+    const a = managers[i];
+    const g = oEl("g", { style: "cursor:pointer" }, world);
+    ofc.sprites.push({ node: g, key: dx + dy });
+    if (!a) {
+      // bos kose: saksi
+      const [px, py] = oP(dx, dy);
+      oEl("ellipse", { cx: px, cy: py + 1, rx: 9, ry: 4, fill: "rgba(0,0,0,.35)" }, g);
+      oEl("path", { d: `M${px - 6} ${py - 10} L${px + 6} ${py - 10} L${px + 4.5} ${py} L${px - 4.5} ${py}Z`, fill: "#6b4a2b" }, g);
+      for (const [ox, oy, r] of [[0, -20, 8], [-6, -15, 6], [6, -15, 6], [0, -27, 5.5]]) oEl("circle", { cx: px + ox, cy: py + oy, r, fill: "#2f7d5b", stroke: "rgba(0,0,0,.25)", "stroke-width": 0.6 }, g);
+      return;
+    }
+    const seat = oP(dx, dy - 0.75);
+    const pw = oPawn(g, a.color || "#888");
+    pw.g.setAttribute("transform", `translate(${seat[0].toFixed(1)},${seat[1].toFixed(1)})`);
+    oBox(g, dx, dy, 1.7, 0.9, 0, 0.55, "#515a70", "#2a3041", "#373e52");
+    const lid = oBox(g, dx - 0.3, dy + 0.12, 0.6, 0.06, 0.55, 0.98, "#3a4154", "#232938", "#2a3040").l;
+    lid.setAttribute("class", "o-lid");
+    const paper = oEl("polygon", { points: oPts([oP(dx + 0.25, dy - 0.2, 0.56), oP(dx + 0.7, dy - 0.2, 0.56), oP(dx + 0.7, dy + 0.18, 0.56), oP(dx + 0.25, dy + 0.18, 0.56)]), fill: "#e6c65c", stroke: "#8a6f17", "stroke-width": 0.7, style: "display:none" }, g);
+    const short = OF_SHORT[a.key] || a.name.split(" ")[0];
+    const pill = oPill(top, `${a.emoji} ${short}`, seat[0], seat[1] - 38, { dot: true });
+    pill.g.style.cursor = "pointer";
+    if (!a.enabled) { g.setAttribute("opacity", ".35"); pill.g.setAttribute("opacity", ".45"); pw.g.style.display = "none"; }
+    const d = { key: a.key, name: a.name, color: a.color || "#888", spot: [dx, dy + 1.2], pawn: pw, lid, paper, dot: pill.dot, load: 0, flash: null, i, pill: { g: pill.g, x: seat[0], y: seat[1] - 38, w: pill.w, base: a.enabled ? 1 : 0.45, dim: false } };
+    ofc.desks[a.key] = d;
+    g.onclick = pill.g.onclick = () => editAgent(a.key);
+  });
+  ofc.sprites.sort((x, y) => x.key - y.key);
+  ofc.sprites.forEach((s) => world.appendChild(s.node));
+
+  // CEO
+  const cp = oPawn(world, "#c9a227", true);
+  oEl("path", { d: "M0 -14.2 l-1.9 4.6 l1.9 3.4 l1.9 -3.4Z", fill: "#3a2f0c" }, cp.body);
+  const folder = oEl("g", { style: "display:none" }, cp.b);
+  const frect = oEl("rect", { x: 5.5, y: -15, width: 9.5, height: 7.5, rx: 1.2, fill: "#e6c65c", stroke: "#3a2f0c", "stroke-width": 0.8, transform: "rotate(-12 10 -11)" }, folder);
+  const tag = oEl("g", {}, top);
+  oPill(tag, "👔 CEO", 0, -40, { fill: "rgba(42,34,13,.95)", stroke: "#c9a227", color: "#e6c65c" });
+  const bub = oEl("g", { style: "display:none;cursor:pointer" }, top);
+  const brect = oEl("rect", { y: -11, height: 22, rx: 11, fill: "#ece9e2" }, bub);
+  oEl("path", { d: "M-4 10 L0 16 L4 10Z", fill: "#ece9e2" }, bub);
+  const btext = oEl("text", { x: 0, y: 4, "text-anchor": "middle", "font-size": 11, "font-weight": 700, fill: "#16130a", "font-family": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" }, bub);
+  bub.onclick = () => { if (ofc.answer) showTab("chat"); };
+  ofc.ceo = { node: cp.g, bob: cp.b, folder, frect, tag, bub, brect, btext, pos: [...OF_HOME], path: [], resolve: null, phase: 0, speed: 4.2, zi: -1, world };
+
+  // zarf
+  const env = oEl("g", { style: "display:none" }, top);
+  oEl("rect", { x: -9, y: -6.5, width: 18, height: 13, rx: 2, fill: "#ece9e2", stroke: "#16130a", "stroke-width": 0.8 }, env);
+  oEl("path", { d: "M-9 -6 L0 1.5 L9 -6", fill: "none", stroke: "#16130a", "stroke-width": 0.9 }, env);
+  ofc.env = { node: env, t0: 0 };
+
+  ofc.built = true;
+  officeSync();
+}
+
+function ofRoute(from, to) {
+  const same = (a, b) => a[0] === b[0] && a[1] === b[1];
+  if (same(from, to)) return [];
+  const path = [];
+  let cur = from;
+  if (same(cur, OF_HOME)) { path.push([...OF_EXIT]); cur = OF_EXIT; }
+  const dest = same(to, OF_HOME) ? OF_EXIT : to;
+  if (!same(cur, dest)) {
+    if (cur[1] === dest[1]) path.push([...dest]);
+    else {
+      let v = Math.abs(cur[0] - 3) + Math.abs(dest[0] - 3) <= Math.abs(cur[0] - 6) + Math.abs(dest[0] - 6) ? 3 : 6;
+      if (cur[1] === OF_EXIT[1] || dest[1] === OF_EXIT[1]) v = 3;
+      if (cur[0] !== v) path.push([v, cur[1]]);
+      path.push([v, dest[1]]);
+      if (dest[0] !== v) path.push([...dest]);
+    }
+  }
+  if (same(to, OF_HOME)) path.push([...OF_HOME]);
+  return path;
+}
+function ofWalk(to) {
+  const c = ofc.ceo;
+  const path = ofRoute(c.pos, to);
+  if (!path.length) return Promise.resolve();
+  c.path = path;
+  return new Promise((res) => (c.resolve = res));
+}
+const ofWait = (ms) => new Promise((r) => setTimeout(r, ms));
+function ofSay(text) { const e = $("#oTickText"); if (e) e.textContent = text; }
+function ofBubble(text) {
+  const c = ofc.ceo;
+  if (!text) { c.bub.style.display = "none"; return; }
+  const w = [...text].length * 6.3 + 22;
+  c.brect.setAttribute("x", -w / 2);
+  c.brect.setAttribute("width", w);
+  c.btext.textContent = text;
+  c.bub.style.display = "";
+}
+function ofCarry(kind) {
+  const c = ofc.ceo;
+  c.folder.style.display = kind ? "" : "none";
+  if (kind) c.frect.setAttribute("fill", kind === "done" ? "#3ecf8e" : kind === "error" ? "#ff6b6b" : "#e6c65c");
+}
+function ofDeskLook(d) {
+  const working = d.load > 0;
+  d.lid.setAttribute("fill", working ? d.color : "#2a3040");
+  d.lid.classList.toggle("work", working);
+  d.paper.style.display = working ? "" : "none";
+  d.dot.setAttribute("fill", working ? "#5b9dff" : d.flash || "#5d6372");
+  d.dot.classList.toggle("work", working);
+  if (!working) d.pawn.b.removeAttribute("transform");
+}
+function ofAnswerShown(on) {
+  ofc.answer = on;
+  const b = $("#oAnswerBtn");
+  if (b) b.classList.toggle("hidden", !on);
+}
+function ofIdleLook() {
+  if (!ofc.built || ofc.busy || ofc.answer) return;
+  const working = Object.values(ofc.desks).filter((d) => d.load > 0);
+  if (working.length) {
+    ofBubble(null);
+    ofSay("Çalışıyor: " + working.map((d) => OF_SHORT[d.key] || d.name).join(", ") + ". CEO sonuçları bekliyor.");
+  } else if (state.activeRun) {
+    ofBubble("düşünüyor…");
+    ofSay(state.activeRun.note && state.activeRun.status === "thinking" ? state.activeRun.note : "CEO düşünüyor");
+  } else {
+    ofBubble(null);
+    ofSay("Ofis sakin. CEO'ya bir iş ver, ekibi izle.");
+  }
+}
+function ofEnqueue(job) {
+  ofc.queue.push(job);
+  ofRun();
+}
+async function ofRun() {
+  if (ofc.busy || !ofc.built) return;
+  ofc.busy = true;
+  const gen = ofc.gen, c = ofc.ceo;
+  while (ofc.queue.length && gen === ofc.gen) {
+    const job = ofc.queue.shift();
+    c.speed = 4.2 * Math.min(2.4, 1 + ofc.queue.length * 0.35);
+    const d = ofc.desks[job.key];
+    if (job.type === "deliver") {
+      if (!d) continue;
+      ofBubble(null);
+      ofCarry("task");
+      ofSay("CEO görevi götürüyor: " + d.name);
+      await ofWalk(d.spot);
+      if (gen !== ofc.gen) break;
+      ofCarry(null);
+      d.load++;
+      ofDeskLook(d);
+      ofSay(d.name + " görevi aldı, çalışıyor");
+      await ofWait(420);
+    } else if (job.type === "collect") {
+      if (!d) continue;
+      ofBubble(null);
+      ofSay("CEO sonucu almaya gidiyor: " + d.name);
+      await ofWalk(d.spot);
+      if (gen !== ofc.gen) break;
+      d.load = Math.max(0, d.load - 1);
+      d.flash = job.ok ? "#3ecf8e" : "#ff6b6b";
+      ofDeskLook(d);
+      setTimeout(() => { if (gen === ofc.gen) { d.flash = null; ofDeskLook(d); } }, 3500);
+      ofCarry(job.ok ? "done" : "error");
+      ofSay(job.ok ? d.name + " işi teslim etti" : d.name + " işi tamamlayamadı");
+      await ofWait(420);
+      if (gen !== ofc.gen) break;
+      if (ofc.queue.length && ofc.queue[0].type === "deliver") {
+        ofSay("CEO dosyayı sıradaki kişiye götürüyor");
+      } else if (!ofc.queue.length || ofc.queue[0].type === "answer") {
+        ofSay("CEO sonucu masasına götürüyor");
+        await ofWalk(OF_HOME);
+        if (gen !== ofc.gen) break;
+        ofCarry(null);
+      }
+    } else if (job.type === "answer") {
+      await ofWalk(OF_HOME);
+      if (gen !== ofc.gen) break;
+      ofCarry(null);
+      Object.values(ofc.desks).forEach((x) => { x.load = 0; ofDeskLook(x); });
+      ofc.queue = [];
+      ofAnswerShown(true);
+      ofBubble(job.ok ? "Cevap hazır ✓" : "İş durdu");
+      ofSay(job.ok ? "CEO cevabı hazırladı." : "İş tamamlanamadı, ayrıntı sohbette.");
+    }
+  }
+  if (gen !== ofc.gen) return;
+  if (!ofc.queue.length) {
+    await ofWalk(OF_HOME);
+    if (gen !== ofc.gen) return;
+    ofCarry(null);
+  }
+  ofc.busy = false;
+  if (ofc.queue.length) ofRun();
+  else ofIdleLook();
+}
+function officeOnTask(t) {
+  if (!ofc.built) return;
+  const prev = ofc.known.get(t.id);
+  const live = t.status === "queued" || t.status === "running";
+  if (!prev) {
+    ofc.known.set(t.id, live ? "live" : "closed");
+    if (live) { ofAnswerShown(false); ofEnqueue({ type: "deliver", key: t.agent_key }); }
+  } else if (prev === "live" && !live) {
+    ofc.known.set(t.id, "closed");
+    ofEnqueue({ type: "collect", key: t.agent_key, ok: t.status === "done" });
+  }
+}
+function officeOnAnswer(ok) {
+  if (!ofc.built) return;
+  ofEnqueue({ type: "answer", ok });
+}
+function officeOnAsk() {
+  if (!ofc.built) return;
+  ofAnswerShown(false);
+  ofBubble(null);
+  ofc.env.t0 = performance.now();
+  ofSay("Mesajın CEO'ya gidiyor");
+  setTimeout(ofIdleLook, 800);
+}
+function officeSync() {
+  if (!ofc.built) return;
+  const c = ofc.ceo;
+  ofc.gen++;
+  ofc.queue = []; ofc.busy = false; ofc.known = new Map();
+  c.path = []; c.pos = [...OF_HOME];
+  if (c.resolve) { const r = c.resolve; c.resolve = null; r(); }
+  ofCarry(null);
+  ofAnswerShown(false);
+  Object.values(ofc.desks).forEach((d) => { d.load = 0; d.flash = null; ofDeskLook(d); });
+  for (const t of state.runTasks) officeOnTask(t);
+  ofIdleLook();
+  renderOfficeTasks();
+}
+function renderOfficeTasks() {
+  const box = $("#oTasks");
+  if (!box) return;
+  const open = new Set([...box.querySelectorAll(".trow.open")].map((e) => e.dataset.id));
+  box.innerHTML = state.runTasks.map((t) => taskRow(t, open.has(t.id))).join("");
+  box.querySelectorAll(".trow").forEach((e) => (e.onclick = () => e.classList.toggle("open")));
+}
+function officeFrame(ts) {
+  requestAnimationFrame(officeFrame);
+  if (!ofc.built) return;
+  const dt = Math.min(0.05, Math.max(0, (ts - ofc.last) / 1000));
+  ofc.last = ts;
+  const c = ofc.ceo;
+  const walking = c.path.length > 0;
+  if (walking) {
+    let step = c.speed * dt;
+    while (step > 0 && c.path.length) {
+      const [tx, ty] = c.path[0];
+      const dx = tx - c.pos[0], dy = ty - c.pos[1];
+      const dist = Math.hypot(dx, dy);
+      if (dist <= step) { c.pos = [tx, ty]; c.path.shift(); step -= dist; }
+      else { c.pos = [c.pos[0] + (dx / dist) * step, c.pos[1] + (dy / dist) * step]; step = 0; }
+    }
+    c.phase += dt * 12;
+    if (!c.path.length && c.resolve) { const r = c.resolve; c.resolve = null; r(); }
+  }
+  if (state.tab !== "office") return;
+  const [x, y] = oP(c.pos[0], c.pos[1]);
+  c.node.setAttribute("transform", `translate(${x.toFixed(1)},${y.toFixed(1)})`);
+  c.bob.setAttribute("transform", `translate(0,${walking ? (-Math.abs(Math.sin(c.phase)) * 2.4).toFixed(2) : 0})`);
+  c.tag.setAttribute("transform", `translate(${x.toFixed(1)},${y.toFixed(1)})`);
+  c.bub.setAttribute("transform", `translate(${x.toFixed(1)},${(y - 64).toFixed(1)})`);
+  const key = c.pos[0] + c.pos[1];
+  let zi = ofc.sprites.findIndex((s) => s.key > key);
+  if (zi < 0) zi = ofc.sprites.length;
+  if (zi !== c.zi) {
+    c.zi = zi;
+    c.world.insertBefore(c.node, zi < ofc.sprites.length ? ofc.sprites[zi].node : null);
+  }
+  for (const d of Object.values(ofc.desks)) {
+    if (d.load > 0) d.pawn.b.setAttribute("transform", `translate(0,${(Math.sin(ts / 130 + d.i * 1.7) * 1.3).toFixed(2)})`);
+    // CEO etiketin arkasinda kalirsa etiketi soluklastir
+    const pl = d.pill;
+    const dim = Math.abs(x - pl.x) < pl.w / 2 + 9 && y - 30 < pl.y + 9 && y > pl.y - 9;
+    if (dim !== pl.dim) { pl.dim = dim; pl.g.setAttribute("opacity", dim ? 0.18 : pl.base); }
+  }
+  const e = ofc.env;
+  if (e.t0) {
+    const k = (ts - e.t0) / 700;
+    if (k >= 1) { e.t0 = 0; e.node.style.display = "none"; }
+    else {
+      const q = 1 - Math.pow(1 - Math.max(0, k), 3);
+      const to = oP(1.5, 1.5, 0.9);
+      const ex = 200 + (to[0] - 200) * q, ey = 372 + (to[1] - 372) * q - Math.sin(q * Math.PI) * 30;
+      e.node.style.display = "";
+      e.node.setAttribute("transform", `translate(${ex.toFixed(1)},${ey.toFixed(1)}) scale(${(1.5 - q * 0.6).toFixed(2)})`);
+    }
+  }
+}
+requestAnimationFrame(officeFrame);
+
+$("#oAnswerBtn").onclick = () => showTab("chat");
 
 // ---------------------------------------------------------------- gorsel goruntuleyici
 function openViewer(url, path) {

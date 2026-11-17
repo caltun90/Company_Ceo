@@ -19,6 +19,10 @@ Telefonda çalışan kişisel bir "şirket" uygulaması. Claude CEO mesajını a
 
 Modeller, talimatlar ve açık/kapalı durumu uygulamadaki **Ekip** sekmesinden değiştirilir (veritabanındaki `agents` tablosu).
 
+## Ofis sekmesi
+
+Müdürler masalarında oturur. CEO bir görev verdiğinde dosyayı elinde ilgili masaya götürür, iş bitince sonucu alır ve sıradaki kişiye ya da kendi masasına taşır. Sahne canlı görev kayıtlarından (`tasks`, `runs`, `messages`) beslenir; bir masaya dokununca o müdürün ayarları açılır.
+
 ## Yapı
 
 - `docs/` : PWA (GitHub Pages buradan yayınlanır). Tek dosya `index.html`, `manifest.json`, `sw.js`, ikonlar.
