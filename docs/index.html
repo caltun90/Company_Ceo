@@ -601,12 +601,15 @@ function showTab(tab) {
   $("#teamView").classList.toggle("hidden", tab !== "team");
   $("#tasksView").classList.toggle("hidden", tab !== "tasks");
   $("#newBtn").classList.toggle("hidden", tab !== "chat");
-  if (tab === "team") { $("#topTitle").textContent = "Ekip"; $("#topSub").textContent = "CEO ve müdürler"; renderTeam(); }
+  if (tab === "team") { $("#topTitle").textContent = "Ekip"; $("#topSub").textContent = "CEO ve müdürler"; renderTeam(); refreshKeys(); }
   else if (tab === "tasks") { $("#topTitle").textContent = "Görevler"; $("#topSub").textContent = "Müdürlere verilen işler"; loadTasks(); }
   else { const c = state.convs.find((x) => x.id === state.convId); $("#topTitle").textContent = c ? c.title : "Şirket"; renderTop(); }
 }
 
 // ---------------------------------------------------------------- ekip
+async function refreshKeys() {
+  try { const h = await invoke({ action: "health" }); state.keys = h.keys; if (state.tab === "team") renderTeam(); } catch {}
+}
 const PROVIDER_LABEL = { anthropic: "Anthropic", openai: "OpenAI", openai_image: "OpenAI", gemini: "Google", gemini_image: "Google", xai: "xAI" };
 const PROVIDER_KEY = { anthropic: "anthropic", openai: "openai", openai_image: "openai", gemini: "gemini", gemini_image: "gemini", xai: "xai" };
 function keyBadge(a) {

@@ -1,5 +1,5 @@
 // Uygulama kabugunu onbellege alir; veriler her zaman canli gelir.
-const CACHE = "sirket-v1";
+const CACHE = "sirket-v2";
 const SHELL = ["./", "index.html", "manifest.json", "icons/icon-180.png", "icons/icon-192.png", "icons/icon-512.png"];
 
 self.addEventListener("install", (e) => {
