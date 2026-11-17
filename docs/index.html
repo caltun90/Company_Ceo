@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Şirket</title>
+<meta name="theme-color" content="#0c0e13">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Şirket">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0c0e13; --bg2:#12151c; --card:#171b24; --card2:#1d222d; --line:#262c39;
+  --text:#ece9e2; --muted:#8d93a1; --dim:#5d6372;
+  --brass:#c9a227; --brass2:#e6c65c; --brassbg:rgba(201,162,39,.12);
+  --ok:#3ecf8e; --warn:#f2b84b; --err:#ff6b6b; --run:#5b9dff;
+  --r:18px; --safe-t:env(safe-area-inset-top); --safe-b:env(safe-area-inset-bottom);
+  --serif:"Fraunces", Georgia, serif;
+  --sans:-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:16px/1.45 var(--sans);overscroll-behavior:none}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+input,textarea,select{font:inherit;color:var(--text)}
+.hidden{display:none!important}
+
+/* ---------- giris */
+#auth{min-height:100%;display:flex;flex-direction:column;justify-content:center;padding:calc(var(--safe-t) + 40px) 28px calc(var(--safe-b) + 40px);
+  background:radial-gradient(120% 60% at 50% 0%, rgba(201,162,39,.16), transparent 60%), var(--bg)}
+.seal{width:84px;height:84px;border-radius:24px;display:grid;place-items:center;font-size:40px;margin-bottom:22px;
+  background:linear-gradient(145deg,#2a2412,#15120a);border:1px solid rgba(201,162,39,.45);box-shadow:0 10px 40px rgba(201,162,39,.18)}
+#auth h1{font:600 40px/1.05 var(--serif);margin:0 0 8px;letter-spacing:-.5px}
+#auth p.sub{color:var(--muted);margin:0 0 30px}
+.field{display:block;width:100%;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:15px 16px;margin-bottom:12px;outline:none}
+.field:focus{border-color:var(--brass)}
+.btn{display:block;width:100%;border-radius:14px;padding:15px;font-weight:600;text-align:center}
+.btn.primary{background:var(--brass);color:#16130a}
+.btn.ghost{color:var(--muted);margin-top:10px}
+.msg-line{min-height:22px;color:var(--warn);font-size:14px;margin:6px 2px 10px}
+
+/* ---------- uygulama iskeleti */
+#app{position:fixed;inset:0;display:flex;flex-direction:column}
+header.top{padding:calc(var(--safe-t) + 8px) 14px 10px;display:flex;align-items:center;gap:10px;background:rgba(12,14,19,.86);
+  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-bottom:1px solid var(--line);z-index:5}
+.iconbtn{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--card);border:1px solid var(--line);flex:none}
+.iconbtn svg{width:20px;height:20px;stroke:var(--text);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.top .titlewrap{flex:1;min-width:0;text-align:center}
+.top .brand{font:600 20px/1.15 var(--serif);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top .subtitle{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+main{flex:1;overflow:hidden;position:relative}
+.view{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
+nav.tabs{display:flex;border-top:1px solid var(--line);background:rgba(12,14,19,.94);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  padding:6px 8px calc(var(--safe-b) + 4px)}
+nav.tabs button{flex:1;padding:6px 0 4px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;color:var(--dim)}
+nav.tabs button svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+nav.tabs button.on{color:var(--brass2)}
+
+/* ---------- sohbet */
+#chatView{display:flex;flex-direction:column;overflow:hidden}
+#feed{flex:1;overflow-y:auto;padding:16px 14px 8px;-webkit-overflow-scrolling:touch}
+.empty{padding:28px 6px 10px;text-align:center}
+.empty .seal{margin:0 auto 16px;width:72px;height:72px;font-size:34px}
+.empty h2{font:600 26px/1.15 var(--serif);margin:0 0 6px}
+.empty p{color:var(--muted);margin:0 0 22px;font-size:15px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.chip{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:9px 14px;font-size:14px}
+.row{display:flex;margin:10px 0;gap:9px}
+.row.me{justify-content:flex-end}
+.avatar{width:32px;height:32px;border-radius:10px;flex:none;display:grid;place-items:center;font-size:17px;background:var(--brassbg);border:1px solid rgba(201,162,39,.35)}
+.bubble{max-width:86%;border-radius:var(--r);padding:11px 14px;word-wrap:break-word;overflow-wrap:anywhere}
+.me .bubble{background:var(--brass);color:#16130a;border-bottom-right-radius:6px;white-space:pre-wrap}
+.ceo .bubble{background:var(--card);border:1px solid var(--line);border-top-left-radius:6px}
+.err .bubble{background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.35);color:#ffc9c9}
+.time{font-size:11px;color:var(--dim);margin-top:4px}
+.me .time{text-align:right;color:rgba(22,19,10,.55)}
+.md p{margin:0 0 .6em}.md p:last-child{margin-bottom:0}
+.md h1,.md h2,.md h3{font:600 1.08em/1.3 var(--sans);margin:.8em 0 .4em}
+.md ul,.md ol{margin:.2em 0 .7em;padding-left:1.25em}.md li{margin:.15em 0}
+.md a{color:var(--brass2);text-decoration:none;border-bottom:1px solid rgba(230,198,92,.35)}
+.md code{font:13px/1.4 ui-monospace,Menlo,monospace;background:#0f1218;padding:1px 5px;border-radius:6px}
+.md pre{position:relative;background:#0f1218;border:1px solid var(--line);border-radius:12px;padding:12px;overflow-x:auto;margin:.6em 0}
+.md pre code{background:none;padding:0;font-size:12.5px}
+.md table{border-collapse:collapse;width:100%;font-size:13.5px;margin:.6em 0;display:block;overflow-x:auto}
+.md th,.md td{border:1px solid var(--line);padding:6px 8px;text-align:left;white-space:nowrap}
+.md th{background:var(--card2)}
+.md blockquote{margin:.5em 0;padding-left:10px;border-left:3px solid var(--brass);color:var(--muted)}
+.copy{position:absolute;top:6px;right:6px;font-size:11px;background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:3px 8px;color:var(--muted)}
+.imgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;margin-top:10px}
+.imgs .ph{aspect-ratio:1;border-radius:12px;background:var(--card2);overflow:hidden;position:relative}
+.imgs img{width:100%;height:100%;object-fit:cover;display:block}
+.imgs .tag{position:absolute;left:6px;bottom:6px;font-size:10px;background:rgba(0,0,0,.6);padding:2px 6px;border-radius:6px}
+
+/* canli is karti */
+.runcard{margin:12px 0 6px 41px;background:linear-gradient(180deg,#191d27,#151922);border:1px solid var(--line);border-radius:var(--r);padding:12px;position:relative;overflow:hidden}
+.runcard::before{content:"";position:absolute;left:0;top:0;height:2px;width:40%;background:linear-gradient(90deg,transparent,var(--brass),transparent);animation:sweep 1.6s linear infinite}
+@keyframes sweep{from{transform:translateX(-100%)}to{transform:translateX(350%)}}
+.runhead{display:flex;align-items:center;gap:8px;font-size:14px}
+.runhead .dot{width:8px;height:8px;border-radius:50%;background:var(--brass);animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.25}}
+.runhead .note{flex:1;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.runhead .cancel{font-size:12px;color:var(--dim);border:1px solid var(--line);border-radius:8px;padding:3px 8px}
+.tasklist{margin-top:10px;display:flex;flex-direction:column;gap:6px}
+.trow{background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:9px 10px}
+.trow .tline{display:flex;align-items:center;gap:8px;font-size:14px}
+.trow .tname{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill{font-size:11px;border-radius:999px;padding:2px 8px;border:1px solid currentColor;white-space:nowrap}
+.pill.queued{color:var(--dim)}.pill.running{color:var(--run)}.pill.done{color:var(--ok)}.pill.error{color:var(--err)}
+.trow .tbody{display:none;margin-top:8px;font-size:13.5px;color:#cfd3dc}
+.trow.open .tbody{display:block}
+.trow .label{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.6px;margin:8px 0 3px}
+.trow .instr{white-space:pre-wrap;color:var(--muted)}
+
+/* yazma alani */
+.composer{padding:8px 10px 10px;border-top:1px solid var(--line);background:var(--bg);display:flex;gap:8px;align-items:flex-end}
+.composer textarea{flex:1;resize:none;max-height:140px;min-height:44px;background:var(--card);border:1px solid var(--line);border-radius:22px;padding:11px 16px;outline:none}
+.composer textarea:focus{border-color:rgba(201,162,39,.6)}
+.send{width:44px;height:44px;border-radius:50%;background:var(--brass);display:grid;place-items:center;flex:none}
+.send:disabled{opacity:.4}
+.send svg{width:20px;height:20px;stroke:#16130a;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---------- ekip */
+.pad{padding:16px 14px calc(24px)}
+.sectiontitle{font:600 22px/1.2 var(--serif);margin:4px 2px 4px}
+.sectionsub{color:var(--muted);font-size:14px;margin:0 2px 14px}
+.ceocard{background:linear-gradient(145deg,#231e0f,#16140d);border:1px solid rgba(201,162,39,.45);border-radius:22px;padding:16px;display:flex;gap:14px;align-items:center;margin-bottom:12px}
+.ceocard .big{width:56px;height:56px;border-radius:16px;font-size:30px;display:grid;place-items:center;background:rgba(201,162,39,.15)}
+.ceocard .n{font:600 19px/1.2 var(--serif)}
+.meta{font-size:12.5px;color:var(--muted)}
+.org{position:relative;padding-left:16px;margin-left:30px;border-left:1px dashed rgba(201,162,39,.35)}
+.agent{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:13px;display:flex;gap:12px;align-items:center;margin-bottom:10px;position:relative}
+.agent::before{content:"";position:absolute;left:-17px;top:50%;width:16px;border-top:1px dashed rgba(201,162,39,.35)}
+.agent .ic{width:44px;height:44px;border-radius:13px;font-size:22px;display:grid;place-items:center;flex:none}
+.agent .info{flex:1;min-width:0}
+.agent .n{font-weight:600}
+.agent.off{opacity:.45}
+.key{display:block;font-size:11px;margin-top:2px}
+.key.ok{color:var(--ok)}.key.no{color:var(--err)}
+.sw{width:46px;height:28px;border-radius:999px;background:var(--line);position:relative;flex:none;transition:.2s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:.2s}
+.sw.on{background:var(--ok)}.sw.on::after{left:21px}
+.notice{background:rgba(242,184,75,.09);border:1px solid rgba(242,184,75,.35);color:#f6d79a;border-radius:14px;padding:12px;font-size:13.5px;margin-bottom:14px}
+
+/* ---------- gorevler */
+.tcard{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;margin-bottom:9px}
+.tcard .tline{display:flex;gap:9px;align-items:center}
+.tcard .tbody{display:none;margin-top:10px;font-size:14px}
+.tcard.open .tbody{display:block}
+.filter{display:flex;gap:6px;overflow-x:auto;padding-bottom:10px;margin-bottom:4px}
+.filter button{white-space:nowrap;font-size:13px;border:1px solid var(--line);border-radius:999px;padding:6px 12px;background:var(--card);color:var(--muted)}
+.filter button.on{border-color:var(--brass);color:var(--brass2)}
+.linkbtn{color:var(--brass2);font-size:13px;margin-top:8px}
+
+/* ---------- cekmece ve sayfa */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:20;opacity:0;pointer-events:none;transition:.25s}
+.scrim.show{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;bottom:0;left:0;width:84%;max-width:360px;background:var(--bg2);z-index:21;transform:translateX(-102%);transition:.28s cubic-bezier(.2,.8,.2,1);
+  padding:calc(var(--safe-t) + 14px) 12px calc(var(--safe-b) + 14px);display:flex;flex-direction:column;border-right:1px solid var(--line)}
+.drawer.show{transform:none}
+.drawer h3{font:600 22px var(--serif);margin:6px 6px 12px}
+.convs{flex:1;overflow-y:auto}
+.conv{display:flex;align-items:center;gap:8px;padding:11px 10px;border-radius:12px}
+.conv.on{background:var(--card)}
+.conv .t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.conv .d{font-size:11px;color:var(--dim)}
+.conv .del{color:var(--dim);font-size:15px;padding:4px 6px}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;background:var(--bg2);border-top-left-radius:24px;border-top-right-radius:24px;border-top:1px solid var(--line);
+  max-height:88%;overflow-y:auto;transform:translateY(102%);transition:.3s cubic-bezier(.2,.8,.2,1);padding:10px 16px calc(var(--safe-b) + 18px)}
+.sheet.show{transform:none}
+.grab{width:40px;height:5px;border-radius:9px;background:var(--line);margin:4px auto 14px}
+.sheet label{display:block;font-size:12px;color:var(--muted);margin:10px 2px 5px}
+.sheet textarea.field{min-height:170px;font-size:14px;resize:vertical}
+.viewer{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.94);display:flex;flex-direction:column;align-items:center;justify-content:center}
+.viewer img{max-width:100%;max-height:78%;object-fit:contain}
+.viewer .vbar{position:absolute;left:0;right:0;bottom:calc(var(--safe-b) + 20px);display:flex;justify-content:center;gap:12px}
+.viewer .vbar button{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 16px}
+.toast{position:fixed;left:50%;bottom:calc(var(--safe-b) + 90px);transform:translateX(-50%);background:var(--card2);border:1px solid var(--line);padding:10px 16px;border-radius:12px;z-index:40;font-size:14px}
+</style>
+</head>
+<body>
+
+<!-- GIRIS -->
+<section id="auth" class="hidden">
+  <div class="seal">👔</div>
+  <h1>Şirket</h1>
+  <p class="sub">CEO'na yaz, gerisini ekip halletsin.</p>
+  <input id="email" class="field" type="email" placeholder="E-posta" autocomplete="email" inputmode="email">
+  <input id="pass" class="field" type="password" placeholder="Şifre" autocomplete="current-password">
+  <div id="authMsg" class="msg-line"></div>
+  <button id="loginBtn" class="btn primary">Giriş yap</button>
+  <button id="signupBtn" class="btn ghost">İlk kurulum: hesap oluştur</button>
+</section>
+
+<!-- UYGULAMA -->
+<section id="app" class="hidden">
+  <header class="top">
+    <button class="iconbtn" id="menuBtn" aria-label="Konular"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg></button>
+    <div class="titlewrap"><div class="brand" id="topTitle">Şirket</div><div class="subtitle" id="topSub">CEO hazır</div></div>
+    <button class="iconbtn" id="newBtn" aria-label="Yeni konu"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+  </header>
+
+  <main>
+    <div class="view" id="chatView">
+      <div id="feed"></div>
+      <div class="composer">
+        <textarea id="input" rows="1" placeholder="CEO'ya yaz..."></textarea>
+        <button class="send" id="sendBtn" aria-label="Gönder"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+      </div>
+    </div>
+
+    <div class="view hidden" id="teamView"><div class="pad" id="teamPad"></div></div>
+    <div class="view hidden" id="tasksView"><div class="pad" id="tasksPad"></div></div>
+  </main>
+
+  <nav class="tabs">
+    <button data-tab="chat" class="on"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>Sohbet</button>
+    <button data-tab="team"><svg viewBox="0 0 24 24"><circle cx="12" cy="6" r="3"/><circle cx="5" cy="17" r="2.5"/><circle cx="12" cy="17" r="2.5"/><circle cx="19" cy="17" r="2.5"/><path d="M12 9v3M5 14.5V12h14v2.5M12 12v2.5"/></svg>Ekip</button>
+    <button data-tab="tasks"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/></svg>Görevler</button>
+  </nav>
+</section>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer">
+  <h3>Konular</h3>
+  <button class="btn primary" id="drawerNew" style="margin-bottom:12px">+ Yeni konu</button>
+  <div class="convs" id="convs"></div>
+  <button class="btn ghost" id="logoutBtn">Çıkış yap</button>
+</aside>
+<div class="sheet" id="sheet"></div>
+
+<script type="module">
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { marked } from "https://esm.sh/marked@12";
+import DOMPurify from "https://esm.sh/dompurify@3";
+
+const SUPABASE_URL = "https://eqqtmcmrapbgiscxncht.supabase.co";
+const SUPABASE_KEY = "sb_publishable_rPcyVH_IS4ulof8vWF-f9w_NUzfOnFl";
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
+
+marked.setOptions({ breaks: true, gfm: true });
+
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const STATUS_TR = { queued: "sırada", running: "çalışıyor", done: "bitti", error: "hata" };
+
+const state = {
+  user: null,
+  convId: localStorage.getItem("convId") || null,
+  convs: [],
+  messages: [],
+  agents: [],
+  keys: null,
+  activeRun: null,
+  runTasks: [],
+  allTasks: [],
+  taskFilter: "all",
+  tab: "chat",
+  signed: new Map(),
+  channel: null,
+};
+
+// ---------------------------------------------------------------- yardimcilar
+function toast(t, ms = 2200) {
+  const el = document.createElement("div");
+  el.className = "toast";
+  el.textContent = t;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), ms);
+}
+function fmtTime(iso) {
+  const d = new Date(iso);
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  return sameDay
+    ? d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })
+    : d.toLocaleDateString("tr-TR", { day: "numeric", month: "short" }) + " " + d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+}
+function dur(a, b) {
+  if (!a) return "";
+  const s = Math.max(0, Math.round(((b ? new Date(b) : new Date()) - new Date(a)) / 1000));
+  return s < 60 ? `${s} sn` : `${Math.floor(s / 60)} dk ${s % 60} sn`;
+}
+function agentOf(key) {
+  return state.agents.find((a) => a.key === key) || { key, name: key, emoji: "🤖", color: "#888", title: "" };
+}
+function md(text) {
+  const html = DOMPurify.sanitize(marked.parse(text || ""), { ADD_ATTR: ["target"] });
+  const wrap = document.createElement("div");
+  wrap.className = "md";
+  wrap.innerHTML = html;
+  wrap.querySelectorAll("a").forEach((a) => { a.target = "_blank"; a.rel = "noopener"; });
+  wrap.querySelectorAll("pre").forEach((pre) => {
+    const b = document.createElement("button");
+    b.className = "copy";
+    b.textContent = "Kopyala";
+    b.onclick = async () => {
+      await navigator.clipboard.writeText(pre.querySelector("code")?.innerText ?? pre.innerText);
+      b.textContent = "Kopyalandı";
+      setTimeout(() => (b.textContent = "Kopyala"), 1500);
+    };
+    pre.appendChild(b);
+  });
+  return wrap;
+}
+async function signedUrls(paths) {
+  const need = paths.filter((p) => !state.signed.has(p));
+  if (need.length) {
+    const { data } = await sb.storage.from("ceo-files").createSignedUrls(need, 60 * 60 * 12);
+    (data || []).forEach((d) => d.signedUrl && state.signed.set(d.path, d.signedUrl));
+  }
+  return paths.map((p) => state.signed.get(p));
+}
+async function invoke(body) {
+  const { data, error } = await sb.functions.invoke("ceo", { body });
+  if (error) {
+    let msg = error.message;
+    try { const j = await error.context.json(); msg = j.error || msg; } catch {}
+    throw new Error(msg);
+  }
+  return data;
+}
+
+// ---------------------------------------------------------------- giris
+async function boot() {
+  const { data } = await sb.auth.getSession();
+  if (data.session) return enterApp(data.session.user);
+  $("#auth").classList.remove("hidden");
+}
+$("#loginBtn").onclick = async () => {
+  $("#authMsg").textContent = "";
+  const { data, error } = await sb.auth.signInWithPassword({ email: $("#email").value.trim(), password: $("#pass").value });
+  if (error) return ($("#authMsg").textContent = error.message.includes("confirm") ? "Önce e-postandaki onay linkine tıkla." : "Giriş olmadı: " + error.message);
+  enterApp(data.user);
+};
+$("#signupBtn").onclick = async () => {
+  $("#authMsg").textContent = "";
+  const email = $("#email").value.trim(), password = $("#pass").value;
+  if (password.length < 8) return ($("#authMsg").textContent = "Şifre en az 8 karakter olsun.");
+  const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: location.origin + location.pathname } });
+  if (error) return ($("#authMsg").textContent = error.message);
+  if (data.session) return enterApp(data.user);
+  $("#authMsg").textContent = "Onay e-postası gönderildi. Linke tıkla, sonra buradan giriş yap.";
+};
+$("#logoutBtn").onclick = async () => { await sb.auth.signOut(); location.reload(); };
+
+async function enterApp(user) {
+  state.user = user;
+  $("#auth").classList.add("hidden");
+  $("#app").classList.remove("hidden");
+  const { data: owner } = await sb.from("app_owner").select("user_id").maybeSingle();
+  if (!owner) {
+    $("#feed").innerHTML = `<div class="empty"><div class="seal">🔒</div><h2>Erişim yok</h2><p>Bu şirket başka bir hesaba ait.</p></div>`;
+    return;
+  }
+  await Promise.all([loadAgents(), loadConvs()]);
+  if (state.convId && !state.convs.find((c) => c.id === state.convId)) state.convId = null;
+  await openConv(state.convId);
+  subscribe();
+  invoke({ action: "health" }).then((h) => { state.keys = h.keys; if (state.tab === "team") renderTeam(); }).catch(() => {});
+}
+
+// ---------------------------------------------------------------- veri
+async function loadAgents() {
+  const { data } = await sb.from("agents").select("*").order("sort");
+  state.agents = data || [];
+}
+async function loadConvs() {
+  const { data } = await sb.from("conversations").select("*").order("updated_at", { ascending: false }).limit(100);
+  state.convs = data || [];
+  renderConvs();
+}
+async function openConv(id) {
+  state.convId = id;
+  id ? localStorage.setItem("convId", id) : localStorage.removeItem("convId");
+  state.messages = [];
+  state.activeRun = null;
+  state.runTasks = [];
+  if (id) {
+    const [{ data: msgs }, { data: runs }] = await Promise.all([
+      sb.from("messages").select("*").eq("conversation_id", id).order("created_at").limit(300),
+      sb.from("runs").select("id,status,note,step,created_at,conversation_id").eq("conversation_id", id).in("status", ["thinking", "delegating"]).order("created_at", { ascending: false }).limit(1),
+    ]);
+    state.messages = msgs || [];
+    if (runs && runs[0]) {
+      state.activeRun = runs[0];
+      const { data: t } = await sb.from("tasks").select("*").eq("run_id", runs[0].id).order("created_at");
+      state.runTasks = t || [];
+    }
+  }
+  const c = state.convs.find((x) => x.id === id);
+  $("#topTitle").textContent = c ? c.title : "Şirket";
+  renderFeed(true);
+  renderConvs();
+}
+
+// ---------------------------------------------------------------- canli
+function subscribe() {
+  if (state.channel) sb.removeChannel(state.channel);
+  state.channel = sb
+    .channel("sirket")
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, ({ new: m }) => {
+      if (m.conversation_id === state.convId && !state.messages.find((x) => x.id === m.id)) {
+        state.messages.push(m);
+        if (m.role !== "user" && state.activeRun?.id === m.run_id) { state.activeRun = null; state.runTasks = []; }
+        renderFeed(true);
+        if (m.role === "ceo" && document.hidden && navigator.vibrate) navigator.vibrate(80);
+      } else if (m.role === "ceo") {
+        toast("CEO başka bir konuda cevap verdi");
+      }
+    })
+    .on("postgres_changes", { event: "*", schema: "public", table: "runs" }, ({ new: r }) => {
+      if (!r || r.conversation_id !== state.convId) return;
+      if (r.status === "thinking" || r.status === "delegating") state.activeRun = { ...state.activeRun, ...r };
+      else if (state.activeRun?.id === r.id) { state.activeRun = null; state.runTasks = []; }
+      renderRunCard();
+      renderTop();
+    })
+    .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, ({ new: t }) => {
+      if (!t) return;
+      const i = state.allTasks.findIndex((x) => x.id === t.id);
+      if (i >= 0) state.allTasks[i] = t; else state.allTasks.unshift(t);
+      if (state.activeRun && t.run_id === state.activeRun.id) {
+        const j = state.runTasks.findIndex((x) => x.id === t.id);
+        if (j >= 0) state.runTasks[j] = t; else state.runTasks.push(t);
+        renderRunCard();
+      }
+      if (state.tab === "tasks") renderTasks();
+    })
+    .on("postgres_changes", { event: "*", schema: "public", table: "conversations" }, () => loadConvs())
+    .subscribe();
+}
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && state.user) { openConv(state.convId); loadConvs(); }
+});
+setInterval(() => { if (state.activeRun) renderRunCard(); }, 1000);
+
+// ---------------------------------------------------------------- sohbet cizimi
+const CHIPS = [
+  "Bugün Türkiye ve dünyada öne çıkan 5 haber ne?",
+  "Demek O Yüzden kanalı için 5 video fikri ve başlık",
+  "Dropshipping işim için bir logo tasarla, iki seçenek",
+  "X'te bu hafta yapay zeka hakkında ne konuşuluyor?",
+];
+function renderFeed(scroll) {
+  const feed = $("#feed");
+  feed.innerHTML = "";
+  if (!state.messages.length && !state.activeRun) {
+    feed.innerHTML = `<div class="empty"><div class="seal">👔</div><h2>Ne yapalım patron?</h2>
+      <p>Yaz, CEO işi ekibe dağıtsın.</p><div class="chips">${CHIPS.map((c) => `<button class="chip">${esc(c)}</button>`).join("")}</div></div>`;
+    feed.querySelectorAll(".chip").forEach((b) => (b.onclick = () => { $("#input").value = b.textContent; autoGrow(); $("#input").focus(); }));
+  }
+  for (const m of state.messages) feed.appendChild(msgEl(m));
+  const rc = document.createElement("div");
+  rc.id = "runSlot";
+  feed.appendChild(rc);
+  renderRunCard();
+  renderTop();
+  if (scroll) requestAnimationFrame(() => (feed.scrollTop = feed.scrollHeight));
+}
+function msgEl(m) {
+  const row = document.createElement("div");
+  row.className = "row " + (m.role === "user" ? "me" : m.role === "ceo" ? "ceo" : "err");
+  if (m.role !== "user") row.innerHTML = `<div class="avatar">${m.role === "ceo" ? "👔" : "⚠️"}</div>`;
+  const b = document.createElement("div");
+  b.className = "bubble";
+  if (m.role === "ceo") b.appendChild(md(m.content));
+  else b.textContent = m.content;
+  if (Array.isArray(m.images) && m.images.length) {
+    const g = document.createElement("div");
+    g.className = "imgs";
+    m.images.forEach((im) => {
+      const ph = document.createElement("div");
+      ph.className = "ph";
+      ph.innerHTML = `<span class="tag">${esc(agentOf(im.agent).emoji)} ${esc(agentOf(im.agent).name)}</span>`;
+      g.appendChild(ph);
+      signedUrls([im.path]).then(([u]) => {
+        if (!u) return;
+        const img = new Image();
+        img.src = u;
+        img.loading = "lazy";
+        img.onclick = () => openViewer(u, im.path);
+        ph.prepend(img);
+      });
+    });
+    b.appendChild(g);
+  }
+  const t = document.createElement("div");
+  t.className = "time";
+  t.textContent = fmtTime(m.created_at);
+  b.appendChild(t);
+  row.appendChild(b);
+  return row;
+}
+function renderRunCard() {
+  const slot = $("#runSlot");
+  if (!slot) return;
+  const r = state.activeRun;
+  if (!r) { slot.innerHTML = ""; return; }
+  const open = new Set([...slot.querySelectorAll(".trow.open")].map((e) => e.dataset.id));
+  slot.innerHTML = `<div class="runcard">
+    <div class="runhead"><span class="dot"></span><span class="note">${esc(r.note || "CEO çalışıyor")}</span>
+    <button class="cancel" id="cancelRun">Durdur</button></div>
+    ${state.runTasks.length ? `<div class="tasklist">${state.runTasks.map((t) => taskRow(t, open.has(t.id))).join("")}</div>` : ""}
+  </div>`;
+  slot.querySelectorAll(".trow").forEach((e) => (e.onclick = () => e.classList.toggle("open")));
+  $("#cancelRun").onclick = async (ev) => {
+    ev.stopPropagation();
+    try { await invoke({ action: "cancel", run_id: r.id }); } catch (e) { toast(e.message); }
+  };
+}
+function taskRow(t, open) {
+  const a = agentOf(t.agent_key);
+  return `<div class="trow ${open ? "open" : ""}" data-id="${t.id}">
+    <div class="tline"><span>${esc(a.emoji)}</span><span class="tname">${esc(a.name)}</span>
+    <span class="meta">${dur(t.started_at, t.finished_at)}</span><span class="pill ${t.status}">${STATUS_TR[t.status]}</span></div>
+    <div class="tbody"><div class="label">Talimat</div><div class="instr">${esc(t.instruction)}</div>
+    ${t.output ? `<div class="label">Sonuç</div><div class="instr">${esc(t.output.slice(0, 1500))}${t.output.length > 1500 ? "..." : ""}</div>` : ""}
+    ${t.error ? `<div class="label">Hata</div><div class="instr" style="color:var(--err)">${esc(t.error)}</div>` : ""}</div></div>`;
+}
+function renderTop() {
+  const r = state.activeRun;
+  $("#topSub").textContent = r ? (r.status === "delegating" ? "Ekip çalışıyor" : "CEO düşünüyor") : "CEO hazır";
+  $("#sendBtn").disabled = !!r;
+}
+
+// ---------------------------------------------------------------- gonder
+const input = $("#input");
+function autoGrow() { input.style.height = "auto"; input.style.height = Math.min(140, input.scrollHeight) + "px"; }
+input.addEventListener("input", autoGrow);
+$("#sendBtn").onclick = send;
+async function send() {
+  const text = input.value.trim();
+  if (!text || state.activeRun) return;
+  input.value = "";
+  autoGrow();
+  const temp = { id: "tmp" + Date.now(), role: "user", content: text, created_at: new Date().toISOString(), conversation_id: state.convId };
+  state.messages.push(temp);
+  state.activeRun = { id: null, status: "thinking", note: "CEO'ya iletiliyor", created_at: new Date().toISOString() };
+  renderFeed(true);
+  try {
+    const res = await invoke({ action: "send", conversation_id: state.convId, text });
+    state.messages = state.messages.filter((m) => m.id !== temp.id);
+    if (!state.convId) {
+      await loadConvs();
+      await openConv(res.conversation_id);
+    } else {
+      const { data } = await sb.from("messages").select("*").eq("conversation_id", state.convId).order("created_at").limit(300);
+      state.messages = data || state.messages;
+    }
+    if (!state.activeRun || !state.activeRun.id) state.activeRun = { id: res.run_id, status: "thinking", note: "CEO düşünüyor", created_at: new Date().toISOString() };
+    renderFeed(true);
+  } catch (e) {
+    state.activeRun = null;
+    state.messages = state.messages.filter((m) => m.id !== temp.id);
+    input.value = text;
+    renderFeed(true);
+    toast(e.message, 4000);
+  }
+}
+
+// ---------------------------------------------------------------- konular
+function renderConvs() {
+  $("#convs").innerHTML = state.convs.length
+    ? state.convs.map((c) => `<div class="conv ${c.id === state.convId ? "on" : ""}" data-id="${c.id}">
+        <div style="flex:1;min-width:0"><div class="t">${esc(c.title)}</div><div class="d">${fmtTime(c.updated_at)}</div></div>
+        <button class="del" data-del="${c.id}" aria-label="Sil">🗑</button></div>`).join("")
+    : `<p class="meta" style="padding:10px">Henüz konu yok.</p>`;
+  $("#convs").querySelectorAll(".conv").forEach((e) => (e.onclick = (ev) => {
+    if (ev.target.dataset.del) return;
+    closeDrawer();
+    showTab("chat");
+    openConv(e.dataset.id);
+  }));
+  $("#convs").querySelectorAll("[data-del]").forEach((b) => (b.onclick = async () => {
+    if (!confirm("Bu konu ve içindeki her şey silinsin mi?")) return;
+    await sb.from("conversations").delete().eq("id", b.dataset.del);
+    if (state.convId === b.dataset.del) openConv(null);
+    loadConvs();
+  }));
+}
+function openDrawer() { $("#drawer").classList.add("show"); $("#scrim").classList.add("show"); }
+function closeDrawer() { $("#drawer").classList.remove("show"); $("#sheet").classList.remove("show"); $("#scrim").classList.remove("show"); }
+$("#menuBtn").onclick = openDrawer;
+$("#scrim").onclick = closeDrawer;
+const newConv = () => { closeDrawer(); showTab("chat"); openConv(null); input.focus(); };
+$("#newBtn").onclick = newConv;
+$("#drawerNew").onclick = newConv;
+
+// ---------------------------------------------------------------- sekmeler
+document.querySelectorAll("nav.tabs button").forEach((b) => (b.onclick = () => showTab(b.dataset.tab)));
+function showTab(tab) {
+  state.tab = tab;
+  document.querySelectorAll("nav.tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
+  $("#chatView").classList.toggle("hidden", tab !== "chat");
+  $("#teamView").classList.toggle("hidden", tab !== "team");
+  $("#tasksView").classList.toggle("hidden", tab !== "tasks");
+  $("#newBtn").classList.toggle("hidden", tab !== "chat");
+  if (tab === "team") { $("#topTitle").textContent = "Ekip"; $("#topSub").textContent = "CEO ve müdürler"; renderTeam(); }
+  else if (tab === "tasks") { $("#topTitle").textContent = "Görevler"; $("#topSub").textContent = "Müdürlere verilen işler"; loadTasks(); }
+  else { const c = state.convs.find((x) => x.id === state.convId); $("#topTitle").textContent = c ? c.title : "Şirket"; renderTop(); }
+}
+
+// ---------------------------------------------------------------- ekip
+const PROVIDER_LABEL = { anthropic: "Anthropic", openai: "OpenAI", openai_image: "OpenAI", gemini: "Google", gemini_image: "Google", xai: "xAI" };
+const PROVIDER_KEY = { anthropic: "anthropic", openai: "openai", openai_image: "openai", gemini: "gemini", gemini_image: "gemini", xai: "xai" };
+function keyBadge(a) {
+  if (!state.keys) return "";
+  const ok = state.keys[PROVIDER_KEY[a.provider]];
+  return `<span class="key ${ok ? "ok" : "no"}">${ok ? "● API anahtarı tanımlı" : "● API anahtarı eksik"}</span>`;
+}
+function renderTeam() {
+  const ceo = state.agents.find((a) => a.key === "ceo");
+  const rest = state.agents.filter((a) => a.key !== "ceo");
+  const missing = state.keys ? Object.entries(state.keys).filter(([, v]) => !v).map(([k]) => k.toUpperCase() + "_API_KEY") : [];
+  $("#teamPad").innerHTML = `
+    ${missing.length ? `<div class="notice">Eksik anahtarlar: <b>${missing.join(", ")}</b>. Supabase panelinde Edge Functions > Secrets bölümüne ekleyince ilgili müdürler çalışmaya başlar.</div>` : ""}
+    <div class="sectiontitle">Organizasyon</div>
+    <p class="sectionsub">Bir kişiye dokun: model ve talimatını değiştir.</p>
+    ${ceo ? `<div class="ceocard" data-key="ceo"><div class="big">${ceo.emoji}</div><div style="flex:1;min-width:0">
+      <div class="n">${esc(ceo.name)} · ${esc(ceo.title)}</div><div class="meta">${esc(PROVIDER_LABEL[ceo.provider])} · ${esc(ceo.model)}${keyBadge(ceo)}</div></div></div>` : ""}
+    <div class="org">${rest.map((a) => `<div class="agent ${a.enabled ? "" : "off"}" data-key="${a.key}">
+      <div class="ic" style="background:${a.color}22;border:1px solid ${a.color}55">${a.emoji}</div>
+      <div class="info"><div class="n">${esc(a.name)}</div><div class="meta">${esc(PROVIDER_LABEL[a.provider])} · ${esc(a.model)}${keyBadge(a)}</div></div>
+      <button class="sw ${a.enabled ? "on" : ""}" data-toggle="${a.key}" aria-label="Aç/kapat"></button></div>`).join("")}</div>`;
+  $("#teamPad").querySelectorAll("[data-key]").forEach((e) => (e.onclick = (ev) => {
+    if (ev.target.dataset.toggle) return;
+    editAgent(e.dataset.key);
+  }));
+  $("#teamPad").querySelectorAll("[data-toggle]").forEach((b) => (b.onclick = async () => {
+    const a = agentOf(b.dataset.toggle);
+    const { error } = await sb.from("agents").update({ enabled: !a.enabled, updated_at: new Date().toISOString() }).eq("key", a.key);
+    if (error) return toast(error.message);
+    a.enabled = !a.enabled;
+    renderTeam();
+  }));
+}
+function editAgent(key) {
+  const a = agentOf(key);
+  const isImage = a.provider.endsWith("_image");
+  $("#sheet").innerHTML = `<div class="grab"></div>
+    <div style="display:flex;gap:12px;align-items:center;margin-bottom:6px"><div class="ic" style="width:48px;height:48px;border-radius:14px;font-size:26px;display:grid;place-items:center;background:${a.color}22">${a.emoji}</div>
+    <div><div style="font:600 20px var(--serif)">${esc(a.name)}</div><div class="meta">${esc(a.title)} · ${esc(PROVIDER_LABEL[a.provider])}</div></div></div>
+    <label>Model</label><input class="field" id="eModel" value="${esc(a.model)}">
+    ${key !== "ceo" ? `<label>Görev tanımı (CEO buna bakarak iş verir)</label><textarea class="field" id="eDesc" style="min-height:90px">${esc(a.description)}</textarea>` : ""}
+    ${isImage ? "" : `<label>Sistem talimatı</label><textarea class="field" id="ePrompt">${esc(a.system_prompt)}</textarea>`}
+    <label>Ayarlar (JSON)</label><input class="field" id="eOpts" value='${esc(JSON.stringify(a.options || {}))}'>
+    <button class="btn primary" id="eSave" style="margin-top:8px">Kaydet</button>
+    <button class="btn ghost" id="eClose">Vazgeç</button>`;
+  $("#eClose").onclick = closeDrawer;
+  $("#sheet").classList.add("show");
+  $("#scrim").classList.add("show");
+  $("#eSave").onclick = async () => {
+    let options;
+    try { options = JSON.parse($("#eOpts").value || "{}"); } catch { return toast("Ayarlar geçerli JSON değil"); }
+    const patch = { model: $("#eModel").value.trim(), options, updated_at: new Date().toISOString() };
+    if ($("#eDesc")) patch.description = $("#eDesc").value;
+    if ($("#ePrompt")) patch.system_prompt = $("#ePrompt").value;
+    const { error } = await sb.from("agents").update(patch).eq("key", key);
+    if (error) return toast(error.message);
+    Object.assign(a, patch);
+    closeDrawer();
+    renderTeam();
+    toast("Kaydedildi");
+  };
+}
+
+// ---------------------------------------------------------------- gorevler
+async function loadTasks() {
+  const { data } = await sb.from("tasks").select("*").order("created_at", { ascending: false }).limit(80);
+  state.allTasks = data || [];
+  renderTasks();
+}
+function renderTasks() {
+  const keys = [...new Set(state.allTasks.map((t) => t.agent_key))];
+  const list = state.taskFilter === "all" ? state.allTasks : state.allTasks.filter((t) => t.agent_key === state.taskFilter);
+  const open = new Set([...document.querySelectorAll(".tcard.open")].map((e) => e.dataset.id));
+  $("#tasksPad").innerHTML = `
+    <div class="filter"><button data-f="all" class="${state.taskFilter === "all" ? "on" : ""}">Hepsi</button>
+    ${keys.map((k) => `<button data-f="${k}" class="${state.taskFilter === k ? "on" : ""}">${esc(agentOf(k).emoji)} ${esc(agentOf(k).name)}</button>`).join("")}</div>
+    ${list.length ? list.map((t) => {
+      const a = agentOf(t.agent_key);
+      return `<div class="tcard ${open.has(t.id) ? "open" : ""}" data-id="${t.id}">
+        <div class="tline"><span style="font-size:20px">${esc(a.emoji)}</span>
+        <div style="flex:1;min-width:0"><div style="font-weight:600">${esc(a.name)}</div>
+        <div class="meta" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.instruction)}</div></div>
+        <div style="text-align:right"><span class="pill ${t.status}">${STATUS_TR[t.status]}</span><div class="meta" style="margin-top:4px">${fmtTime(t.created_at)}</div></div></div>
+        <div class="tbody"><div class="label meta">TALİMAT</div><div style="white-space:pre-wrap;color:var(--muted)">${esc(t.instruction)}</div>
+        ${t.output ? `<div class="label meta" style="margin-top:10px">SONUÇ · ${dur(t.started_at, t.finished_at)}</div><div class="out"></div>` : ""}
+        ${t.error ? `<div class="label meta" style="margin-top:10px">HATA</div><div style="color:var(--err)">${esc(t.error)}</div>` : ""}
+        <button class="linkbtn" data-goto="${t.conversation_id}">Konuya git →</button></div></div>`;
+    }).join("") : `<p class="meta" style="text-align:center;margin-top:40px">Henüz görev yok. CEO'ya bir iş ver.</p>`}`;
+  $("#tasksPad").querySelectorAll("[data-f]").forEach((b) => (b.onclick = () => { state.taskFilter = b.dataset.f; renderTasks(); }));
+  $("#tasksPad").querySelectorAll(".tcard").forEach((c) => {
+    const t = state.allTasks.find((x) => x.id === c.dataset.id);
+    const out = c.querySelector(".out");
+    if (out && t?.output) out.appendChild(md(t.output));
+    c.querySelector(".tline").onclick = () => c.classList.toggle("open");
+  });
+  $("#tasksPad").querySelectorAll("[data-goto]").forEach((b) => (b.onclick = () => { showTab("chat"); openConv(b.dataset.goto); }));
+}
+
+// ---------------------------------------------------------------- gorsel goruntuleyici
+function openViewer(url, path) {
+  const v = document.createElement("div");
+  v.className = "viewer";
+  v.innerHTML = `<img src="${url}"><div class="vbar"><button id="vShare">Paylaş / Kaydet</button><button id="vClose">Kapat</button></div>`;
+  document.body.appendChild(v);
+  v.querySelector("#vClose").onclick = () => v.remove();
+  v.querySelector("img").onclick = () => v.remove();
+  v.querySelector("#vShare").onclick = async () => {
+    try {
+      const blob = await (await fetch(url)).blob();
+      const file = new File([blob], path.split("/").pop(), { type: blob.type });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file] });
+      else window.open(url, "_blank");
+    } catch (e) { if (e.name !== "AbortError") window.open(url, "_blank"); }
+  };
+}
+
+// ---------------------------------------------------------------- baslat
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+boot();
+</script>
+</body>
+</html>
