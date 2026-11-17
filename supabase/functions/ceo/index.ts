@@ -27,11 +27,46 @@ const HISTORY_LIMIT = 30;
 const RESULT_CHAR_LIMIT = 24000;
 const BUCKET = "ceo-files";
 
+// Anahtar adlari esnek: "CHATGPT API KEY", "chatgpt_api_key", "OPENAI_API_KEY" hepsi kabul.
+const KEY_NAMES: Record<string, string[]> = {
+  anthropic: ["ANTHROPICAPIKEY", "CLAUDEAPIKEY"],
+  openai: ["OPENAIAPIKEY", "CHATGPTAPIKEY", "GPTAPIKEY"],
+  gemini: ["GEMINIAPIKEY", "GOOGLEAPIKEY", "GOOGLEAIAPIKEY"],
+  xai: ["XAIAPIKEY", "GROKAPIKEY"],
+};
+const KEY_PREFIX: Record<string, string> = { anthropic: "sk-ant-", openai: "sk-", gemini: "AIza", xai: "xai-" };
+const LITERAL_NAMES: Record<string, string[]> = {
+  anthropic: ["ANTHROPIC_API_KEY", "ANTHROPIC API KEY", "CLAUDE_API_KEY", "CLAUDE API KEY"],
+  openai: ["OPENAI_API_KEY", "OPENAI API KEY", "CHATGPT_API_KEY", "CHATGPT API KEY"],
+  gemini: ["GEMINI_API_KEY", "GEMINI API KEY", "GOOGLE_API_KEY"],
+  xai: ["XAI_API_KEY", "XAI API KEY", "GROK_API_KEY", "GROK API KEY"],
+};
+function findKey(provider: string): string | undefined {
+  for (const name of LITERAL_NAMES[provider]) {
+    try {
+      const v = Deno.env.get(name)?.trim();
+      if (v) return v;
+    } catch { /* gecersiz ad */ }
+  }
+  try {
+    for (const [name, value] of Object.entries(Deno.env.toObject())) {
+      const norm = name.toUpperCase().replace(/[^A-Z0-9]/g, "");
+      if (KEY_NAMES[provider].includes(norm) && value?.trim()) return value.trim();
+    }
+  } catch { /* toObject desteklenmiyor */ }
+  return undefined;
+}
+function keyStatus(provider: string): "ok" | "wrong" | "missing" {
+  const v = findKey(provider);
+  if (!v) return "missing";
+  if (provider === "openai" && v.startsWith("sk-ant-")) return "wrong";
+  return v.startsWith(KEY_PREFIX[provider]) ? "ok" : "wrong";
+}
 const KEYS = {
-  anthropic: () => Deno.env.get("ANTHROPIC_API_KEY"),
-  openai: () => Deno.env.get("OPENAI_API_KEY"),
-  gemini: () => Deno.env.get("GEMINI_API_KEY"),
-  xai: () => Deno.env.get("XAI_API_KEY"),
+  anthropic: () => findKey("anthropic"),
+  openai: () => findKey("openai"),
+  gemini: () => findKey("gemini"),
+  xai: () => findKey("xai"),
 };
 
 const PROVIDER_KEY: Record<string, keyof typeof KEYS> = {
@@ -120,13 +155,11 @@ async function ownerFromRequest(req: Request): Promise<string | null> {
 }
 
 function health() {
+  const status: Record<string, string> = {};
+  for (const p of Object.keys(KEY_NAMES)) status[p] = keyStatus(p);
   return {
-    keys: {
-      anthropic: !!KEYS.anthropic(),
-      openai: !!KEYS.openai(),
-      gemini: !!KEYS.gemini(),
-      xai: !!KEYS.xai(),
-    },
+    keys: Object.fromEntries(Object.entries(status).map(([k, v]) => [k, v === "ok"])),
+    status,
   };
 }
 
@@ -151,7 +184,7 @@ async function handleSend(body: any) {
   const text = String(body.text ?? "").trim();
   if (!text) return json({ error: "Mesaj boş" }, 400);
   if (!KEYS.anthropic()) {
-    return json({ error: "ANTHROPIC_API_KEY eksik. Supabase > Edge Functions > Secrets bölümüne ekle." }, 400);
+    return json({ error: "Anthropic API anahtarı bulunamadı. Supabase > Edge Functions > Secrets bölümüne ANTHROPIC_API_KEY olarak ekle." }, 400);
   }
 
   let conversationId: string | null = body.conversation_id ?? null;

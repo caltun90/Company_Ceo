@@ -362,7 +362,7 @@ async function enterApp(user) {
   if (state.convId && !state.convs.find((c) => c.id === state.convId)) state.convId = null;
   await openConv(state.convId);
   subscribe();
-  invoke({ action: "health" }).then((h) => { state.keys = h.keys; if (state.tab === "team") renderTeam(); }).catch(() => {});
+  invoke({ action: "health" }).then((h) => { state.keys = h.keys; state.keyStatus = h.status; if (state.tab === "team") renderTeam(); }).catch(() => {});
 }
 
 // ---------------------------------------------------------------- veri
@@ -608,21 +608,24 @@ function showTab(tab) {
 
 // ---------------------------------------------------------------- ekip
 async function refreshKeys() {
-  try { const h = await invoke({ action: "health" }); state.keys = h.keys; if (state.tab === "team") renderTeam(); } catch {}
+  try { const h = await invoke({ action: "health" }); state.keys = h.keys; state.keyStatus = h.status; if (state.tab === "team") renderTeam(); } catch {}
 }
 const PROVIDER_LABEL = { anthropic: "Anthropic", openai: "OpenAI", openai_image: "OpenAI", gemini: "Google", gemini_image: "Google", xai: "xAI" };
 const PROVIDER_KEY = { anthropic: "anthropic", openai: "openai", openai_image: "openai", gemini: "gemini", gemini_image: "gemini", xai: "xai" };
 function keyBadge(a) {
   if (!state.keys) return "";
-  const ok = state.keys[PROVIDER_KEY[a.provider]];
-  return `<span class="key ${ok ? "ok" : "no"}">${ok ? "● API anahtarı tanımlı" : "● API anahtarı eksik"}</span>`;
+  const st = state.keyStatus?.[PROVIDER_KEY[a.provider]] ?? (state.keys[PROVIDER_KEY[a.provider]] ? "ok" : "missing");
+  if (st === "ok") return `<span class="key ok">● API anahtarı tanımlı</span>`;
+  if (st === "wrong") return `<span class="key no" style="color:var(--warn)">● Anahtar yanlış görünüyor (başka servisin anahtarı olabilir)</span>`;
+  return `<span class="key no">● API anahtarı eksik</span>`;
 }
 function renderTeam() {
   const ceo = state.agents.find((a) => a.key === "ceo");
   const rest = state.agents.filter((a) => a.key !== "ceo");
-  const missing = state.keys ? Object.entries(state.keys).filter(([, v]) => !v).map(([k]) => k.toUpperCase() + "_API_KEY") : [];
+  const LBL = { anthropic: "Anthropic", openai: "OpenAI (ChatGPT)", gemini: "Gemini", xai: "Grok" };
+  const missing = state.keys ? Object.entries(state.keys).filter(([, v]) => !v).map(([k]) => LBL[k] + (state.keyStatus?.[k] === "wrong" ? " (yanlış anahtar)" : "")) : [];
   $("#teamPad").innerHTML = `
-    ${missing.length ? `<div class="notice">Eksik anahtarlar: <b>${missing.join(", ")}</b>. Supabase panelinde Edge Functions > Secrets bölümüne ekleyince ilgili müdürler çalışmaya başlar.</div>` : ""}
+    ${missing.length ? `<div class="notice">Sorunlu anahtarlar: <b>${missing.join(", ")}</b>. Supabase panelinde Edge Functions > Secrets bölümünden düzeltince ilgili müdürler çalışmaya başlar.</div>` : ""}
     <div class="sectiontitle">Organizasyon</div>
     <p class="sectionsub">Bir kişiye dokun: model ve talimatını değiştir.</p>
     ${ceo ? `<div class="ceocard" data-key="ceo"><div class="big">${ceo.emoji}</div><div style="flex:1;min-width:0">
