@@ -37,9 +37,9 @@ export const BRANDS = [
   {
     id: "thatswhy", name: "That's Why", mono: "TW", color: "#2563EB", avatarFrom: "6afc425eece6dfde5ff66196",
     rows: [
-      { label: "YouTube Shorts", platform: "yt", pool: { type: "buffer", account: "thatswhy", channel: "6afc425eece6dfde5ff66196" }, slots: ["02:00", "14:00", "17:00", "20:00", "23:00"] },
-      { label: "X", platform: "x", pool: { type: "buffer", account: "thatswhy", channel: "6afc42c0ece6dfde5ff66ab6" }, slots: ["02:00", "14:00", "17:00", "20:00", "23:00"] },
-      { label: "TikTok", platform: "tt", pool: { type: "buffer", account: "thatswhy", channel: "6afc4c50ece6dfde5ff6d95f" }, slots: ["02:00", "14:00", "17:00", "20:00", "23:00"] },
+      { label: "YouTube Shorts", platform: "yt", pool: { type: "buffer", account: "thatswhy", channel: "6afc425eece6dfde5ff66196" }, slots: ["14:00", "17:00", "20:00", "23:00"] },
+      { label: "X", platform: "x", pool: { type: "buffer", account: "thatswhy", channel: "6afc42c0ece6dfde5ff66ab6" }, slots: ["14:00", "17:00", "20:00", "23:00"] },
+      { label: "TikTok", platform: "tt", pool: { type: "buffer", account: "thatswhy", channel: "6afc4c50ece6dfde5ff6d95f" }, slots: ["14:00", "17:00", "20:00", "23:00"] },
     ],
   },
   {
@@ -204,7 +204,7 @@ const RANK = { done: 3, ready: 2, error: 1 };
 export function explainError(msg) {
   const m = String(msg || "").toLowerCase();
   if (m.includes("daily posting limit") || m.includes("upload limit") || m.includes("exceeded the number of videos"))
-    return { reason: "YouTube günlük yükleme sınırı doldu", fix: "YouTube bir kanala 24 saatte yüklenebilecek video sayısını sınırlıyor. Kanalda o gün çok yükleme olmuş. Kanalı youtube.com/verify adresinden telefonla doğrulamak sınırı yükseltir, günlük yükleme sayısını azaltmak da çözer." };
+    return { reason: "YouTube günlük yükleme sınırı doldu", fix: "YouTube bir kanala 24 saatte yüklenebilecek video sayısını sınırlıyor ve son 24 saatte bu kanala çok video gitmiş. Kanal zaten doğrulanmış; çözüm günlük yükleme sayısını azaltmak. Sınır 24 saat içinde kendiliğinden açılır, bu gönderiyi istersen Buffer'dan tekrar dene." };
   if (m.includes("lost authorization") || m.includes("refresh your channel"))
     return { reason: "Buffer'ın kanala yetkisi düştü", fix: "Buffer'da Manage Channels > Refresh ile kanalı yeniden bağla, sonra gönderiyi tekrar dene." };
   if (m.includes("aspect ratio"))
