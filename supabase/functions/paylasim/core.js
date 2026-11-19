@@ -27,8 +27,7 @@ export const BRANDS = [
   {
     id: "demek", name: "Demek O Yüzden", mono: "DY", color: "#292524", avatarFrom: "6af4e86d62b70b94b0fcf990",
     rows: [
-      { label: "YouTube Shorts", platform: "yt", kind: "short", pool: { type: "yt", yt: "demek", account: "demek", channel: "6af4e86d62b70b94b0fcf990" }, slots: ["12:00", "15:00", "19:00"] },
-      { label: "YouTube video", platform: "yt", kind: "video", pool: { type: "yt", yt: "demek", account: "demek", channel: "6af4e86d62b70b94b0fcf990" }, slots: ["12:00", "15:00", "19:00"] },
+      { label: "YouTube Shorts", platform: "yt", kind: "short", strict: true, pool: { type: "yt", yt: "demek", account: "demek", channel: "6af4e86d62b70b94b0fcf990" }, slots: ["12:00", "15:00", "19:00"] },
       { label: "YouTube uzun", platform: "yt", kind: "video", days: [1, 4, 6], pool: { type: "yt", yt: "demek", account: "demek", channel: "6af4e86d62b70b94b0fcf990" }, slots: ["16:00"] },
       { label: "TikTok", platform: "tt", pool: { type: "buffer", account: "demek", channel: "6af4dbe562b70b94b0fc2edf" }, slots: ["12:00", "15:00", "19:00"] },
       { label: "Instagram", platform: "ig", pool: { type: "buffer", account: "demek", channel: "6af4db8c62b70b94b0fc2a5e" }, slots: ["12:00", "15:00", "19:00"] },
@@ -113,7 +112,7 @@ async function fetchBufferPosts(key, org, date) {
   const end = new Date(dayStartMs(date) + 26 * 3600e3).toISOString();
   const d = await bufferQuery(key, `query($o: OrganizationId!, $s: DateTime!, $e: DateTime!){
     posts(first: 100, input:{organizationId:$o, filter:{dueAt:{start:$s, end:$e}}, sort:[{field: dueAt, direction: asc}]}){
-      edges{ node{ id channelId status dueAt sentAt text error { message } } } } }`, { o: org, s: start, e: end });
+      edges{ node{ id channelId status dueAt sentAt via text error { message } } } } }`, { o: org, s: start, e: end });
   return d.posts.edges.map((e) => e.node);
 }
 
@@ -201,6 +200,20 @@ export async function collect(keys, date, cache, opts = {}) {
 
 const RANK = { done: 3, ready: 2, error: 1 };
 
+// Bilinen hatalarin sade Turkce aciklamasi ve cozumu
+export function explainError(msg) {
+  const m = String(msg || "").toLowerCase();
+  if (m.includes("daily posting limit") || m.includes("upload limit") || m.includes("exceeded the number of videos"))
+    return { reason: "YouTube günlük yükleme sınırı doldu", fix: "YouTube bir kanala 24 saatte yüklenebilecek video sayısını sınırlıyor. Kanalda o gün çok yükleme olmuş. Kanalı youtube.com/verify adresinden telefonla doğrulamak sınırı yükseltir, günlük yükleme sayısını azaltmak da çözer." };
+  if (m.includes("lost authorization") || m.includes("refresh your channel"))
+    return { reason: "Buffer'ın kanala yetkisi düştü", fix: "Buffer'da Manage Channels > Refresh ile kanalı yeniden bağla, sonra gönderiyi tekrar dene." };
+  if (m.includes("aspect ratio"))
+    return { reason: "Video oranı desteklenmiyor", fix: "Videonun en boy oranı platformun kabul ettiği orana göre yeniden üretilmeli." };
+  if (m.includes("too large") || m.includes("too long") || m.includes("duration"))
+    return { reason: "Video çok büyük ya da çok uzun", fix: "Video süresi veya boyutu platform sınırını aşıyor; kısaltılıp tekrar planlanmalı." };
+  return { reason: "Gönderilemedi", fix: msg ? "Buffer'ın mesajı: " + msg : "Buffer bir hata verdi ama sebep yazmadı." };
+}
+
 function bufferStatus(s) {
   if (s === "sent") return "done";
   if (s === "error") return "error";
@@ -235,6 +248,7 @@ function assign(slots, items) {
   const pairs = [];
   slots.forEach((s, si) => items.forEach((it, ii) => {
     const d = Math.abs(s.ms - it.t);
+    if (s.strict && s.kind !== it.kind) return;
     if (d <= MATCH_WINDOW) pairs.push({ si, ii, score: d + (s.kind && it.kind && s.kind !== it.kind ? KIND_PENALTY : 0) });
   }));
   pairs.sort((a, b) => a.score - b.score);
@@ -259,7 +273,7 @@ export function build(raw, date, now = Date.now()) {
     const acct = r.pool.account;
     const buf = raw.buffer[acct];
     const bufErr = raw.errors["buf:" + acct];
-    const posts = (buf?.posts || []).filter((p) => p.channelId === r.pool.channel);
+    const posts = (buf?.posts || []).filter((p) => p.channelId === r.pool.channel && p.via !== "network");
     const clustered = clusterBuffer(posts);
     if (r.pool.type === "buffer") {
       pools[k] = { items: clustered, unknown: !buf, reason: bufErr };
@@ -291,7 +305,7 @@ export function build(raw, date, now = Date.now()) {
     avatar: Object.values(raw.meta).map((m) => m.avatars?.[b.avatarFrom]).find(Boolean) || null,
     rows: b.rows
       .filter((r) => (r.days || ALL_DAYS).includes(weekday))
-      .map((r) => ({ label: r.label, platform: r.platform, kind: r.kind || null, pk: poolKey(r.pool), slots: r.slots.map((t) => ({ time: t, ms: slotMs(date, t), kind: r.kind || null })) })),
+      .map((r) => ({ label: r.label, platform: r.platform, kind: r.kind || null, pk: poolKey(r.pool), slots: r.slots.map((t) => ({ time: t, ms: slotMs(date, t), kind: r.kind || null, strict: !!r.strict })) })),
   }));
 
   const byPool = {};
@@ -303,7 +317,7 @@ export function build(raw, date, now = Date.now()) {
     const rest = assign(slots, inDay);
     // beklenmeyen ama o gun icin planlanmis gonderiler (ornegin X'teki eski videolar)
     for (const it of rest) {
-      if (it.t < dStart || it.t >= dEnd) continue;
+      if (it.t < dStart || it.t >= dEnd || k.startsWith("yt:")) continue;
       rows[0].slots.push({ time: hhmm(it.t), ms: it.t, item: it, extra: true });
     }
     for (const r of rows) {
@@ -318,14 +332,18 @@ export function build(raw, date, now = Date.now()) {
     for (const r of b.rows) {
       r.slots.sort((a, c) => a.ms - c.ms);
       r.slots = r.slots.map((s) => {
-        let status, note = null;
+        let status, note = null, problem = null;
         if (r.unknown) { status = "unknown"; note = r.reason === "missing_key" ? "Buffer anahtarı yok" : "Veri alınamadı"; }
-        else if (!s.item) { status = "todo"; note = s.ms < now ? "Saati geçti, gönderi yok" : "Henüz hazırlanmadı"; }
-        else if (s.item.status === "error") { status = "todo"; note = "Hata: " + (s.item.error || "gönderilemedi"); }
+        else if (!s.item) {
+          status = "todo";
+          if (s.ms < now) { note = "Saati geçti, gönderi yok"; problem = { reason: "Bu saat için gönderi hiç oluşturulmamış", fix: "Görev bu paylaşımı hazırlamamış ya da planlamamış. Görevin o günkü raporuna bakmak gerekiyor." }; }
+          else note = "Henüz hazırlanmadı";
+        }
+        else if (s.item.status === "error") { status = "todo"; problem = explainError(s.item.error); note = problem.reason; problem.raw = s.item.error || null; }
         else if (s.item.status === "ready") { status = "ready"; note = s.ms + LATE_AFTER < now ? "Saati geçti, hâlâ bekliyor" : "Hazır, saatini bekliyor"; }
         else { status = "done"; note = "Paylaşıldı " + hhmm(s.item.t); }
         b.counts[status]++; counts[status]++;
-        return { time: s.time, status, note, title: s.item?.title || null, extra: !!s.extra };
+        return { time: s.time, status, note, problem, title: s.item?.title || null, extra: !!s.extra };
       });
       delete r.pk;
     }

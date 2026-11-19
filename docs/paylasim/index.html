@@ -61,6 +61,15 @@
   .next .l { font-size: 13px; line-height: 1.35; color: #E7E5E4; }
   .next .l b { color: #fff; }
 
+  .probs { background: #fff; border-radius: 22px; padding: 14px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 1px 2px rgba(28,25,23,0.06); }
+  .probs h2 { margin: 0; font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+  .probs h2 i { font-style: normal; background: var(--todo); color: #fff; border-radius: 10px; font-size: 12px; padding: 2px 8px; }
+  .prob { border: none; background: var(--todo-bg); border-radius: 14px; padding: 10px 12px; text-align: left; display: flex; flex-direction: column; gap: 3px; cursor: pointer; width: 100%; }
+  .prob .w { font-size: 12px; font-weight: 700; color: var(--todo-ink); }
+  .prob .r { font-size: 15px; font-weight: 800; color: var(--ink); }
+  .prob .f { font-size: 13px; line-height: 1.4; color: var(--muted); }
+  .sheet .fix { font-size: 14px; line-height: 1.5; color: var(--ink); background: var(--unk-bg); border-radius: 12px; padding: 10px 12px; }
+  .sheet .raw { font-size: 12px; line-height: 1.4; color: var(--muted); }
   .notice { background: #fff; border: 1px dashed #D6D3D1; color: var(--muted); border-radius: 14px; padding: 10px 12px; font-size: 13px; line-height: 1.4; margin-bottom: 12px; }
 
   /* marka karti */
@@ -133,6 +142,7 @@
   </div>
 
   <div id="next" class="next hidden"></div>
+  <div id="probs" class="probs hidden"></div>
   <div id="notices"></div>
   <div id="cards" class="cards"></div>
   <div class="foot">
@@ -278,6 +288,14 @@ function render() {
     $("#next").classList.remove("hidden");
   } else $("#next").classList.add("hidden");
 
+  const probs = [];
+  data.brands.forEach((b, bi) => b.rows.forEach((r, ri) => r.slots.forEach((s, si) => { if (s.problem) probs.push({ b, r, s, bi, ri, si }); })));
+  if (probs.length) {
+    $("#probs").innerHTML = `<h2>Sorunlar <i>${probs.length}</i></h2>` + probs.map(({ b, r, s, bi, ri, si }) =>
+      `<button class="prob" data-b="${bi}" data-r="${ri}" data-s="${si}"><span class="w">${esc(b.name)} · ${esc(r.label)} · ${s.time}</span><span class="r">${esc(s.problem.reason)}</span><span class="f">${esc(s.problem.fix)}</span></button>`).join("");
+    $("#probs").classList.remove("hidden");
+  } else $("#probs").classList.add("hidden");
+
   const html = [];
   data.brands.forEach((b, bi) => {
     const rows = b.rows.map((r, ri) => ({ r, ri, slots: r.slots.map((s, si) => ({ s, si })).filter(({ s }) => state.filter === "all" || s.status === "todo" || s.status === "ready") })).filter((x) => x.slots.length);
@@ -309,8 +327,8 @@ function render() {
 }
 
 // ------------------------------------------------ detay
-$("#cards").addEventListener("click", (e) => {
-  const el = e.target.closest(".chip"); if (!el) return;
+function openSheet(e) {
+  const el = e.target.closest(".chip, .prob"); if (!el) return;
   const b = state.data.brands[+el.dataset.b], r = b.rows[+el.dataset.r], s = r.slots[+el.dataset.s];
   const cls = s.status === "unknown" ? "unk" : s.status;
   $("#sheetBody").innerHTML = `
@@ -318,10 +336,14 @@ $("#cards").addEventListener("click", (e) => {
     <div class="big">${s.time}</div>
     <div class="pill" style="background:var(--${cls}-bg);color:var(--${cls}-ink)">${esc(s.note || ST[s.status].label)}</div>
     ${s.title ? `<div class="ttl">${esc(s.title)}</div>` : ""}
+    ${s.problem ? `<div class="fix"><b>Ne yapmalı:</b> ${esc(s.problem.fix)}</div>` : ""}
+    ${s.problem?.raw ? `<div class="raw">Buffer: ${esc(s.problem.raw)}</div>` : ""}
     <button class="primary" id="closeSheet">Kapat</button>`;
   $("#sheet").classList.remove("hidden");
   $("#closeSheet").onclick = () => $("#sheet").classList.add("hidden");
-});
+}
+$("#cards").addEventListener("click", openSheet);
+$("#probs").addEventListener("click", openSheet);
 $("#sheet").addEventListener("click", (e) => { if (e.target.id === "sheet") $("#sheet").classList.add("hidden"); });
 
 // ------------------------------------------------ kontroller
